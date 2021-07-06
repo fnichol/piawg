@@ -316,7 +316,7 @@ create_github_release_task:
     image: alpine:3
   env:
     BIN: piawg
-    GITHUB_TOKEN: ENCRYPTED[78c00056ec53c8575696ccc698a8252991e4805f2d8ab303c89a002f9e05aaf5c848f64c0335dc2892b3ac2318fcaa07]
+    GITHUB_TOKEN: ENCRYPTED[568e9f918c3ace4b863bcce5a9601cf20d870ac2c0ca271ffc1a2f05a1b866e746f25338a404f887d018de47b9d925c9]
   install_dependencies_script: apk add curl git jo jq
   create_github_release_script: |
     if ! upload_url="$(
@@ -352,7 +352,7 @@ publish_crate_task:
     - create-github-release
   env:
     CRATE: piawg
-    CRATES_IO_TOKEN: ENCRYPTED[0c6ba7d0bd264cf02d59451d0135eb215d2774a9eb86e89dd9bfb3cab6a1c4aaa48a69edfb3d0ae6f4850441e6e591bb]
+    CRATES_IO_TOKEN: ENCRYPTED[ca0fae2f62eb9cd72c118e6f49c56db717a1be8017030034e884e3461bc67be875c995ff2ae94215a592eca6975c2c75]
   container:
     image: rust:latest
   <<: *base_linux
@@ -364,12 +364,11 @@ publish_github_release_task:
   only_if: $CIRRUS_TAG != ''
   depends_on:
     - create-github-release
-    - build-docker-images
     - publish-crates
   container:
     image: alpine:3
   env:
-    GITHUB_TOKEN: ENCRYPTED[78c00056ec53c8575696ccc698a8252991e4805f2d8ab303c89a002f9e05aaf5c848f64c0335dc2892b3ac2318fcaa07]
+    GITHUB_TOKEN: ENCRYPTED[568e9f918c3ace4b863bcce5a9601cf20d870ac2c0ca271ffc1a2f05a1b866e746f25338a404f887d018de47b9d925c9]
   install_dependencies_script: apk add curl jo jq
   publish_release_script: |
     ./.ci/cirrus-release.sh gh_publish_release \
@@ -393,7 +392,7 @@ trigger_nightly_release_task:
   container:
     image: alpine:3
   env:
-    GITHUB_TOKEN: ENCRYPTED[78c00056ec53c8575696ccc698a8252991e4805f2d8ab303c89a002f9e05aaf5c848f64c0335dc2892b3ac2318fcaa07]
+    GITHUB_TOKEN: ENCRYPTED[568e9f918c3ace4b863bcce5a9601cf20d870ac2c0ca271ffc1a2f05a1b866e746f25338a404f887d018de47b9d925c9]
   install_dependencies_script: apk add curl git jo jq
   trigger_release_script:
     ./.ci/cirrus-release.sh gh_update_tag "$CIRRUS_REPO_FULL_NAME" nightly
