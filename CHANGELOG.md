@@ -8,4 +8,4 @@
 
 <!-- next-url -->
 
-[unreleased]: https://github.com/fnichol/piawg/compare/v0.7.0...HEAD
+[unreleased]: https://github.com/fnichol/piawg/compare/0be995b...HEAD
