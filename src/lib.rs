@@ -21,4 +21,6 @@
 //! ## Examples
 
 #![doc(html_root_url = "https://docs.rs/piawg/0.1.0-dev")]
-#![deny(missing_docs)]
+//#![deny(missing_docs)]
+
+pub mod pia;
