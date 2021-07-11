@@ -24,3 +24,4 @@
 //#![deny(missing_docs)]
 
 pub mod pia;
+pub mod wg;
