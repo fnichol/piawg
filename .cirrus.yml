@@ -158,7 +158,7 @@ anchors:
 #
 env:
   RUST_VERSION: stable
-  MIN_SUPPORTED_RUST_VERSION: 1.46.0 # Due to socket2 (via hyper-rustls) use of `match` in a `const fn`
+  MIN_SUPPORTED_RUST_VERSION: 1.53.0 # Due to use of `DebugStruct.finish_non_exhaustive`
 
 check_task:
   name: check
