@@ -15,13 +15,19 @@ async fn main() {
 
     let username = std::env::var("PIA_USER").expect("PIA_USER is required");
     let password = std::env::var("PIA_PASS").expect("PIA_USER is required");
-    match piawg::pia::get_token(username, password).await {
-        Ok(token) => {
-            println!("pia api token: {}", token);
-        }
-        Err(err) => {
-            eprintln!("error: {:?}", err);
-            std::process::exit(1);
-        }
-    }
+
+    let token = piawg::pia::get_token(username, password)
+        .await
+        .expect("failed to get_token");
+    let (_secret_key, public_key) = piawg::wg::generate_keypair();
+    let api = piawg::pia::WireGuardAPI::create(
+        "vancouver406",
+        "162.216.47.234".parse().expect("failed to parse IpAddr"),
+    )
+    .expect("failed to create api");
+    let response = api
+        .add_key(&token, &public_key)
+        .await
+        .expect("failed to add key");
+    dbg!(response);
 }

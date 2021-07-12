@@ -2,9 +2,12 @@ use base64::encode_config;
 use ipnet::IpNet;
 use rand_core::OsRng;
 use serde::Serialize;
+use serde_with::skip_serializing_none;
 use std::{
+    convert::Infallible,
     fmt,
     net::{IpAddr, SocketAddr},
+    str::FromStr,
 };
 use thiserror::Error;
 use tokio::io::{self, AsyncWrite};
@@ -34,8 +37,14 @@ impl fmt::Debug for SecretKey {
     }
 }
 
-#[derive(Serialize)]
+#[derive(Debug, Serialize)]
 pub struct PublicKey(String);
+
+impl PublicKey {
+    pub fn as_str(&self) -> &str {
+        self.0.as_str()
+    }
+}
 
 impl fmt::Display for PublicKey {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -43,9 +52,34 @@ impl fmt::Display for PublicKey {
     }
 }
 
-impl fmt::Debug for PublicKey {
+impl FromStr for PublicKey {
+    type Err = Infallible;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(Self(s.to_string()))
+    }
+}
+
+#[derive(Debug, Serialize)]
+pub struct ServerKey(String);
+
+impl ServerKey {
+    pub fn as_str(&self) -> &str {
+        self.0.as_str()
+    }
+}
+
+impl fmt::Display for ServerKey {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("PublicKey").finish_non_exhaustive()
+        self.0.fmt(f)
+    }
+}
+
+impl FromStr for ServerKey {
+    type Err = Infallible;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(Self(s.to_string()))
     }
 }
 
@@ -59,13 +93,14 @@ pub fn generate_keypair() -> (SecretKey, PublicKey) {
     (SecretKey(secret), PublicKey(public))
 }
 
+#[skip_serializing_none]
 #[derive(Debug, Serialize, TypedBuilder)]
 #[serde(rename_all = "PascalCase")]
 pub struct WgConfigInterface {
     address: IpNet,
     private_key: SecretKey,
     #[builder(default, setter(strip_option))]
-    #[serde(rename = "DNS", skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "DNS")]
     dns: Option<IpAddr>,
 }
 
