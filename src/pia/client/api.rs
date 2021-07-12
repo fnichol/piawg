@@ -128,16 +128,16 @@ impl WireGuardAPI {
 #[serde_as]
 #[derive(Debug, Deserialize)]
 pub struct AddKeyResponse {
-    dns_servers: Vec<IpAddr>,
-    peer_ip: IpAddr,
+    pub dns_servers: Vec<IpAddr>,
+    pub peer_ip: IpAddr,
     #[serde_as(as = "DisplayFromStr")]
-    peer_pubkey: PublicKey,
-    server_ip: IpAddr,
+    pub peer_pubkey: PublicKey,
+    pub server_ip: IpAddr,
     #[serde_as(as = "DisplayFromStr")]
-    server_key: ServerKey,
-    server_port: u16,
-    server_vip: IpAddr,
-    status: String,
+    pub server_key: ServerKey,
+    pub server_port: u16,
+    pub server_vip: IpAddr,
+    pub status: String,
 }
 
 fn https_client_native_roots() -> Client<HttpsConnector<HttpConnector>, Body> {

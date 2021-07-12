@@ -2,6 +2,9 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
+use piawg::wg::WgConfig;
+use tokio::fs::File;
+
 mod cli;
 
 #[tokio::main]
@@ -19,15 +22,26 @@ async fn main() {
     let token = piawg::pia::get_token(username, password)
         .await
         .expect("failed to get_token");
-    let (_secret_key, public_key) = piawg::wg::generate_keypair();
+    let (secret_key, public_key) = piawg::wg::generate_keypair();
     let api = piawg::pia::WireGuardAPI::create(
         "vancouver406",
         "162.216.47.234".parse().expect("failed to parse IpAddr"),
     )
     .expect("failed to create api");
-    let response = api
+    let akr = api
         .add_key(&token, &public_key)
         .await
         .expect("failed to add key");
-    dbg!(response);
+    let wg_cfg = WgConfig::from(akr, secret_key);
+
+    let mut file = File::create("pia.conf")
+        .await
+        .expect("failed to create pia.conf");
+    wg_cfg
+        .write(&mut file)
+        .await
+        .expect("failed to write out pia.conf");
+
+    dbg!(&wg_cfg);
+    println!("written out: pia.conf");
 }

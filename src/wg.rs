@@ -1,3 +1,4 @@
+use crate::pia::client::api::AddKeyResponse;
 use base64::encode_config;
 use ipnet::IpNet;
 use rand_core::OsRng;
@@ -97,7 +98,7 @@ pub fn generate_keypair() -> (SecretKey, PublicKey) {
 #[derive(Debug, Serialize, TypedBuilder)]
 #[serde(rename_all = "PascalCase")]
 pub struct WgConfigInterface {
-    address: IpNet,
+    address: IpAddr,
     private_key: SecretKey,
     #[builder(default, setter(strip_option))]
     #[serde(rename = "DNS")]
@@ -109,7 +110,7 @@ pub struct WgConfigInterface {
 pub struct WgConfigPeer {
     #[builder(default = 25)]
     persistent_keepalive: u64,
-    public_key: PublicKey,
+    public_key: ServerKey,
     #[builder(default)]
     #[serde(rename = "AllowedIPs")]
     allowed_ips: IpNet,
@@ -124,6 +125,23 @@ pub struct WgConfig {
 }
 
 impl WgConfig {
+    pub fn from(akr: AddKeyResponse, secret_key: SecretKey) -> Self {
+        Self::builder()
+            .interface(
+                WgConfigInterface::builder()
+                    .address(akr.peer_ip)
+                    .private_key(secret_key)
+                    .build(),
+            )
+            .peer(
+                WgConfigPeer::builder()
+                    .public_key(akr.server_key)
+                    .endpoint(SocketAddr::new(akr.server_ip, akr.server_port))
+                    .build(),
+            )
+            .build()
+    }
+
     pub async fn write<W: ?Sized>(&self, writer: &mut W) -> Result<(), WGError>
     where
         W: AsyncWrite + Unpin,
@@ -147,7 +165,7 @@ mod tests {
     async fn serializes() {
         let expected = indoc! {"
             [Interface]\r
-            Address=192.168.1.101/24\r
+            Address=192.168.1.101\r
             PrivateKey=abc123\r
             [Peer]\r
             PersistentKeepalive=25\r
@@ -159,13 +177,13 @@ mod tests {
         let cfg = WgConfig::builder()
             .interface(
                 WgConfigInterface::builder()
-                    .address("192.168.1.101/24".parse().expect("failed to parse IpNet"))
+                    .address("192.168.1.101".parse().expect("failed to parse IpAddr"))
                     .private_key(SecretKey("abc123".to_string()))
                     .build(),
             )
             .peer(
                 WgConfigPeer::builder()
-                    .public_key(PublicKey("def456".to_string()))
+                    .public_key(ServerKey("def456".to_string()))
                     .endpoint(
                         "10.12.13.14:8888"
                             .parse()
@@ -188,7 +206,7 @@ mod tests {
     async fn serializes_with_dns() {
         let expected = indoc! {"
             [Interface]\r
-            Address=192.168.1.101/24\r
+            Address=192.168.1.101\r
             PrivateKey=abc123\r
             DNS=172.16.0.1\r
             [Peer]\r
@@ -201,18 +219,14 @@ mod tests {
         let cfg = WgConfig::builder()
             .interface(
                 WgConfigInterface::builder()
-                    .address(
-                        "192.168.1.101/24"
-                            .parse()
-                            .expect("failed to parse IPv4Addr"),
-                    )
+                    .address("192.168.1.101".parse().expect("failed to parse IpAddr"))
                     .private_key(SecretKey("abc123".to_string()))
                     .dns("172.16.0.1".parse().expect("failed to parse IpAddr"))
                     .build(),
             )
             .peer(
                 WgConfigPeer::builder()
-                    .public_key(PublicKey("def456".to_string()))
+                    .public_key(ServerKey("def456".to_string()))
                     .endpoint(
                         "10.12.13.14:8888"
                             .parse()
