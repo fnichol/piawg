@@ -2,7 +2,7 @@ use thiserror::Error;
 
 pub mod client;
 
-pub use client::api::{get_token, PIAToken, WireGuardAPI};
+pub use client::{PIAToken, WireGuardAPI};
 
 #[derive(Debug, Error)]
 pub enum PIAError {
