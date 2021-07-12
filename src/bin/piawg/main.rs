@@ -2,7 +2,10 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
-use piawg::wg::WgConfig;
+use piawg::{
+    pia::WireGuardAPI,
+    wg::{self, WgConfig},
+};
 use tokio::fs::File;
 
 mod cli;
@@ -19,11 +22,11 @@ async fn main() {
     let username = std::env::var("PIA_USER").expect("PIA_USER is required");
     let password = std::env::var("PIA_PASS").expect("PIA_USER is required");
 
-    let token = piawg::pia::get_token(username, password)
+    let token = WireGuardAPI::get_token(username, password)
         .await
         .expect("failed to get_token");
-    let (secret_key, public_key) = piawg::wg::generate_keypair();
-    let api = piawg::pia::WireGuardAPI::create(
+    let (secret_key, public_key) = wg::generate_keypair();
+    let api = WireGuardAPI::create(
         "vancouver406",
         "162.216.47.234".parse().expect("failed to parse IpAddr"),
     )

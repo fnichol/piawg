@@ -2,8 +2,7 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
-//! This crate executes a highly specialized algorithm to dynamically generate a greeting in
-//! english to a given subject. It is serious business.
+//! TODO(fnichol): fill in
 //!
 //! ## Usage
 //!
@@ -23,5 +22,6 @@
 #![doc(html_root_url = "https://docs.rs/piawg/0.1.0-dev")]
 //#![deny(missing_docs)]
 
+pub(crate) mod http;
 pub mod pia;
 pub mod wg;

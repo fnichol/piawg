@@ -1,4 +1,4 @@
-use crate::pia::client::api::AddKeyResponse;
+use crate::pia::client::AddKeyResponse;
 use base64::encode_config;
 use ipnet::IpNet;
 use rand_core::OsRng;
