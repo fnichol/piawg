@@ -22,6 +22,21 @@
 #![doc(html_root_url = "https://docs.rs/piawg/0.1.0-dev")]
 //#![deny(missing_docs)]
 
+#[cfg(all(unix, feature = "checkroot"))]
+pub mod checkroot;
 pub(crate) mod http;
+#[cfg(feature = "ipc")]
+pub mod ipc;
+#[cfg(not(feature = "ipc"))]
+mod noipc;
 pub mod pia;
+#[cfg(all(unix, feature = "privs"))]
+pub mod privs;
 pub mod wg;
+
+const INTERFACE: &str = "pia";
+
+#[cfg(feature = "ipc")]
+pub use ipc::InterfaceManagerClient;
+#[cfg(not(feature = "ipc"))]
+pub use noipc::InterfaceManagerClient;
