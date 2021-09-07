@@ -19,6 +19,12 @@ pub(crate) fn parse() -> Args {
     Args::parse()
 }
 
+/// Parse, validate, and return the CLI arguments as a typed struct.
+#[cfg(feature = "ipc")]
+pub(crate) fn parse_wgctl() -> WgctlArgs {
+    Wgctl::parse().into()
+}
+
 /// TODO(fnichol): fill in
 ///
 /// TODO(fnichol): fill in
@@ -26,7 +32,8 @@ pub(crate) fn parse() -> Args {
 /// Project home page: https://github.com/fnichol/piawg
 #[derive(Clap, Debug)]
 #[clap(
-    global_setting(AppSettings::UnifiedHelpMessage),
+    global_setting = AppSettings::ColoredHelp,
+    global_setting = AppSettings::UnifiedHelpMessage,
     max_term_width = 100,
     author = concat!("\nAuthor: ", env!("CARGO_PKG_AUTHORS"), "\n\n"),
     version = env!("CARGO_PKG_VERSION"),
@@ -40,4 +47,26 @@ pub(crate) struct Args {
     /// Multiple -v options increase verbosity. The maximum is 3.
     #[clap(short = 'v', long = "verbose", parse(from_occurrences))]
     pub(crate) verbose: usize,
+}
+
+#[derive(Clap, Debug)]
+#[clap(
+    global_setting = AppSettings::ColoredHelp,
+    global_setting = AppSettings::UnifiedHelpMessage,
+    max_term_width = 100,
+)]
+pub(crate) enum Wgctl {
+    #[clap(name = "__wgctl__")]
+    Wgctl(WgctlArgs),
+}
+
+#[derive(Clap, Debug)]
+pub(crate) struct WgctlArgs {}
+
+impl From<Wgctl> for WgctlArgs {
+    fn from(val: Wgctl) -> Self {
+        match val {
+            Wgctl::Wgctl(val) => val,
+        }
+    }
 }
