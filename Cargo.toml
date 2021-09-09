@@ -38,7 +38,7 @@ checkroot = ["nix"]
 
 [dependencies]
 base64 = "0.13.0"
-clap = { version = "3.0.0-beta.2", optional = true }
+clap = { version = "=3.0.0-beta.2", optional = true }
 futures = { version = "0.3.16", optional = true }
 hyper = { version = "0.14.10", default-features = false, features = ["http1", "http2", "client", "runtime"] }
 hyper-rustls = { version = "0.22.1" }
