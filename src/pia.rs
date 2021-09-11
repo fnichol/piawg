@@ -18,12 +18,24 @@ pub enum PIAError {
     AddKeyResponseParse(serde_json::Error),
     #[error("pia addkey status was not okay; status={0}")]
     AddKeyResponseStatus(String),
+    #[error("cannot create pia bindport request")]
+    BindPortRequest(hyper::http::Error),
+    #[error("response for pia bindport failed")]
+    BindPortResponse(hyper::Error),
+    #[error("parsing pia bindport json response body failed")]
+    BindPortResponseParse(serde_json::Error),
+    #[error("pia bindport status was not okay; status={0}")]
+    BindPortResponseStatus(String),
     #[error("cannot create pia getsignature request")]
     GetSignatureRequest(hyper::http::Error),
     #[error("response for pia getsignature failed")]
     GetSignatureResponse(hyper::Error),
     #[error("parsing pia getsignature json response body failed")]
     GetSignatureResponseParse(serde_json::Error),
+    #[error("response for pia getsignature payload failed")]
+    GetSignatureResponsePayload(#[from] PayloadError),
+    #[error("pia getsignature status was not okay; status={0}")]
+    GetSignatureResponseStatus(String),
     #[error("cannot create pia gettoken request")]
     GetTokenRequest(hyper::http::Error),
     #[error("response for pia gettoken failed")]
@@ -40,6 +52,16 @@ pub enum PIAError {
     ReadResponseBody(hyper::Error),
     #[error("region not found; region_id={0}")]
     RegionNotFound(String),
+    #[error("server vip not set, add_key must be called first")]
+    ServerVipNotSet,
     #[error("error parsing pia wireguard api uri")]
     InvalidUri(hyper::http::uri::InvalidUri),
+}
+
+#[derive(Debug, Error)]
+pub enum PayloadError {
+    #[error("payload base64 decode error")]
+    Decode(#[from] base64::DecodeError),
+    #[error("json deserialize error")]
+    Json(#[from] serde_json::Error),
 }

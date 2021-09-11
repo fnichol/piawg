@@ -57,12 +57,13 @@ mod cmd {
 
         let (secret_key, public_key) = wg::generate_keypair();
 
-        let api = WireGuardAPI::for_region(&region).expect("failed to create api");
+        let mut api = WireGuardAPI::for_region(&region).expect("failed to create api");
 
         let akr = api
             .add_key(&token, &public_key)
             .await
             .expect("failed to add key");
+        dbg!(&akr);
         let config = WgConfig::from(akr, secret_key);
         dbg!(&config);
 
@@ -82,12 +83,17 @@ mod cmd {
             .await
             .expect("failed to terminate interface manager");
 
-        dbg!(&api);
-        // let gsr = api
-        //     .get_signature(&token)
-        //     .await
-        //     .expect("failed to get signature");
-        // dbg!(&gsr);
+        let gsr = api
+            .get_signature(&token)
+            .await
+            .expect("failed to get signature");
+        dbg!(&gsr);
+
+        let bind_port = api
+            .bind_port(gsr.payload_raw(), &gsr.signature)
+            .await
+            .expect("failed to bind port");
+        dbg!(&bind_port);
     }
 
     #[cfg(feature = "ipc")]
