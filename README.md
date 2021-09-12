@@ -131,8 +131,7 @@ cp ./target/release/piawg /dest/path/
 
 ## Library
 
-This crate executes a highly specialized algorithm to dynamically generate a
-greeting in english to a given subject. It is serious business.
+TODO(fnichol): fill in
 
 ### Usage
 

@@ -41,37 +41,37 @@ piawg --help
 
 #### install.sh (Pre-Built Binaries)
 
-An installer is provided at <https://fnichol.github.io/piawg/install.sh> which
-installs a suitable pre-built binary for common systems such as Linux, macOS,
-Windows, and FreeBSD. It can be downloaded and run locally or piped into a shell
-interpreter in the "curl-bash" style as shown below. Note that if you're opposed
-to this idea, feel free to check some of the alternatives below.
+An installer is provided at <https://fnichol.github.io/{{crate}}/install.sh>
+which installs a suitable pre-built binary for common systems such as Linux,
+macOS, Windows, and FreeBSD. It can be downloaded and run locally or piped into
+a shell interpreter in the "curl-bash" style as shown below. Note that if you're
+opposed to this idea, feel free to check some of the alternatives below.
 
 To install the latest release for your system into `$HOME/bin`:
 
 ```sh
-curl -sSf https://fnichol.github.io/piawg/install.sh | sh
+curl -sSf https://fnichol.github.io/{{crate}}/install.sh | sh
 ```
 
 When the installer is run as `root` the installation directory defaults to
 `/usr/local/bin`:
 
 ```sh
-curl -sSf https://fnichol.github.io/piawg/install.sh | sudo sh
+curl -sSf https://fnichol.github.io/{{crate}}/install.sh | sudo sh
 ```
 
 A [nightly] release built from `HEAD` of the main branch is available which can
 also be installed:
 
 ```sh
-curl -sSf https://fnichol.github.io/piawg/install.sh \
+curl -sSf https://fnichol.github.io/{{crate}}/install.sh \
     | sh -s -- --release=nightly
 ```
 
 For a full set of options, check out the help usage with:
 
 ```sh
-curl -sSf https://fnichol.github.io/piawg/install.sh | sh -s -- --help
+curl -sSf https://fnichol.github.io/{{crate}}/install.sh | sh -s -- --help
 ```
 
 #### GitHub Releasees (Pre-Built Binaries)
@@ -87,7 +87,7 @@ If [Rust](https://rustup.rs/) is installed on your system, then installing with
 Cargo is straight forward with:
 
 ```sh
-cargo install piawg
+cargo install {{crate}}
 ```
 
 #### From Source
@@ -98,10 +98,10 @@ the latest commit on the main branch, which may not correspond to the latest
 stable release:
 
 ```sh
-git clone https://github.com/fnichol/piawg.git
-cd piawg
+git clone https://github.com/fnichol/{{crate}}.git
+cd {{crate}}
 cargo build --release
-cp ./target/release/piawg /dest/path/
+cp ./target/release/{{crate}} /dest/path/
 ```
 
 ---
@@ -186,64 +186,66 @@ licensed as above, without any additional terms or conditions.
 
 [badge-bors]: https://bors.tech/images/badge_small.svg
 [badge-ci-build-x86_64-unknown-freebsd]:
-  https://img.shields.io/cirrus/github/fnichol/piawg/staging?style=flat-square&task=build-bin-piawg-x86_64-unknown-freebsd.tar.gz
+  https://img.shields.io/cirrus/github/fnichol/{{crate}}/staging?style=flat-square&task=build-bin-{{crate}}-x86_64-unknown-freebsd.tar.gz
 [badge-ci-build-arm-unknown-linux-gnueabihf]:
-  https://img.shields.io/cirrus/github/fnichol/piawg/staging?style=flat-square&task=build-bin-piawg-arm-unknown-linux-gnueabihf.tar.gz
+  https://img.shields.io/cirrus/github/fnichol/{{crate}}/staging?style=flat-square&task=build-bin-{{crate}}-arm-unknown-linux-gnueabihf.tar.gz
 [badge-ci-build-aarch64-unknown-linux-gnu]:
-  https://img.shields.io/cirrus/github/fnichol/piawg/staging?style=flat-square&task=build-bin-piawg-aarch64-unknown-linux-gnu.tar.gz
+  https://img.shields.io/cirrus/github/fnichol/{{crate}}/staging?style=flat-square&task=build-bin-{{crate}}-aarch64-unknown-linux-gnu.tar.gz
 [badge-ci-build-i686-unknown-linux-gnu]:
-  https://img.shields.io/cirrus/github/fnichol/piawg/staging?style=flat-square&task=build-bin-piawg-i686-unknown-linux-gnu.tar.gz
+  https://img.shields.io/cirrus/github/fnichol/{{crate}}/staging?style=flat-square&task=build-bin-{{crate}}-i686-unknown-linux-gnu.tar.gz
 [badge-ci-build-i686-unknown-linux-musl]:
-  https://img.shields.io/cirrus/github/fnichol/piawg/staging?style=flat-square&task=build-bin-piawg-i686-unknown-linux-musl.tar.gz
+  https://img.shields.io/cirrus/github/fnichol/{{crate}}/staging?style=flat-square&task=build-bin-{{crate}}-i686-unknown-linux-musl.tar.gz
 [badge-ci-build-x86_64-unknown-linux-gnu]:
-  https://img.shields.io/cirrus/github/fnichol/piawg/staging?style=flat-square&task=build-bin-piawg-x86_64-unknown-linux-gnu.tar.gz
+  https://img.shields.io/cirrus/github/fnichol/{{crate}}/staging?style=flat-square&task=build-bin-{{crate}}-x86_64-unknown-linux-gnu.tar.gz
 [badge-ci-build-x86_64-unknown-linux-musl]:
-  https://img.shields.io/cirrus/github/fnichol/piawg/staging?style=flat-square&task=build-bin-piawg-x86_64-unknown-linux-musl.tar.gz
+  https://img.shields.io/cirrus/github/fnichol/{{crate}}/staging?style=flat-square&task=build-bin-{{crate}}-x86_64-unknown-linux-musl.tar.gz
 [badge-ci-build-x86_64-apple-darwin]:
-  https://img.shields.io/cirrus/github/fnichol/piawg/staging?style=flat-square&task=build-bin-piawg-x86_64-apple-darwin.zip
+  https://img.shields.io/cirrus/github/fnichol/{{crate}}/staging?style=flat-square&task=build-bin-{{crate}}-x86_64-apple-darwin.zip
 [badge-ci-build-x86_64-pc-windows-msvc]:
-  https://img.shields.io/cirrus/github/fnichol/piawg/staging?style=flat-square&task=build-bin-piawg-x86_64-pc-windows-msvc.zip
+  https://img.shields.io/cirrus/github/fnichol/{{crate}}/staging?style=flat-square&task=build-bin-{{crate}}-x86_64-pc-windows-msvc.zip
 [badge-ci-check-format]:
-  https://img.shields.io/cirrus/github/fnichol/piawg/staging?style=flat-square&task=check&script=format
+  https://img.shields.io/cirrus/github/fnichol/{{crate}}/staging?style=flat-square&task=check&script=format
 [badge-ci-check-lint]:
-  https://img.shields.io/cirrus/github/fnichol/piawg/staging?style=flat-square&task=check&script=lint
+  https://img.shields.io/cirrus/github/fnichol/{{crate}}/staging?style=flat-square&task=check&script=lint
 [badge-ci-overall]:
-  https://img.shields.io/cirrus/github/fnichol/piawg/main?style=flat-square
+  https://img.shields.io/cirrus/github/fnichol/{{crate}}/main?style=flat-square
 [badge-ci-test-nightly-freebsd]:
-  https://img.shields.io/cirrus/github/fnichol/piawg/staging?style=flat-square&task=test-nightly-x86_64-unknown-freebsd
+  https://img.shields.io/cirrus/github/fnichol/{{crate}}/staging?style=flat-square&task=test-nightly-x86_64-unknown-freebsd
 [badge-ci-test-nightly-linux]:
-  https://img.shields.io/cirrus/github/fnichol/piawg/staging?style=flat-square&task=test-nightly-x86_64-unknown-linux-gnu
+  https://img.shields.io/cirrus/github/fnichol/{{crate}}/staging?style=flat-square&task=test-nightly-x86_64-unknown-linux-gnu
 [badge-ci-test-nightly-macos]:
-  https://img.shields.io/cirrus/github/fnichol/piawg/staging?style=flat-square&task=test-nightly-x86_64-apple-darwin
+  https://img.shields.io/cirrus/github/fnichol/{{crate}}/staging?style=flat-square&task=test-nightly-x86_64-apple-darwin
 [badge-ci-test-nightly-windows]:
-  https://img.shields.io/cirrus/github/fnichol/piawg/staging?style=flat-square&task=test-nightly-x86_64-pc-windows-msvc
+  https://img.shields.io/cirrus/github/fnichol/{{crate}}/staging?style=flat-square&task=test-nightly-x86_64-pc-windows-msvc
 [badge-ci-test-stable-freebsd]:
-  https://img.shields.io/cirrus/github/fnichol/piawg/staging?style=flat-square&task=test-stable-x86_64-unknown-freebsd
+  https://img.shields.io/cirrus/github/fnichol/{{crate}}/staging?style=flat-square&task=test-stable-x86_64-unknown-freebsd
 [badge-ci-test-stable-linux]:
-  https://img.shields.io/cirrus/github/fnichol/piawg/staging?style=flat-square&task=test-stable-x86_64-unknown-linux-gnu
+  https://img.shields.io/cirrus/github/fnichol/{{crate}}/staging?style=flat-square&task=test-stable-x86_64-unknown-linux-gnu
 [badge-ci-test-stable-macos]:
-  https://img.shields.io/cirrus/github/fnichol/piawg/staging?style=flat-square&task=test-stable-x86_64-apple-darwin
+  https://img.shields.io/cirrus/github/fnichol/{{crate}}/staging?style=flat-square&task=test-stable-x86_64-apple-darwin
 [badge-ci-test-stable-windows]:
-  https://img.shields.io/cirrus/github/fnichol/piawg/staging?style=flat-square&task=test-stable-x86_64-pc-windows-msvc
-[badge-crate-dl]: https://img.shields.io/crates/d/piawg.svg?style=flat-square
+  https://img.shields.io/cirrus/github/fnichol/{{crate}}/staging?style=flat-square&task=test-stable-x86_64-pc-windows-msvc
+[badge-crate-dl]:
+  https://img.shields.io/crates/d/{{crate}}.svg?style=flat-square
 [badge-docker-pulls]:
-  https://img.shields.io/docker/pulls/fnichol/piawg.svg?style=flat-square
-[badge-docs]: https://docs.rs/piawg/badge.svg?style=flat-square
+  https://img.shields.io/docker/pulls/fnichol/{{crate}}.svg?style=flat-square
+[badge-docs]: https://docs.rs/{{crate}}/badge.svg?style=flat-square
 [badge-github-dl]:
-  https://img.shields.io/github/downloads/fnichol/piawg/total.svg
-[badge-license]: https://img.shields.io/crates/l/piawg.svg?style=flat-square
-[badge-version]: https://img.shields.io/crates/v/piawg.svg?style=flat-square
+  https://img.shields.io/github/downloads/fnichol/{{crate}}/total.svg
+[badge-license]: https://img.shields.io/crates/l/{{crate}}.svg?style=flat-square
+[badge-version]: https://img.shields.io/crates/v/{{crate}}.svg?style=flat-square
 [bors-dashboard]: https://app.bors.tech/repositories/32089
-[changelog]: https://github.com/fnichol/piawg/blob/main/CHANGELOG.md
-[ci]: https://cirrus-ci.com/github/fnichol/piawg
-[ci-staging]: https://cirrus-ci.com/github/fnichol/piawg/staging
-[code-of-conduct]: https://github.com/fnichol/piawg/blob/main/CODE_OF_CONDUCT.md
-[crate]: https://crates.io/crates/piawg
-[docker]: https://hub.docker.com/r/fnichol/piawg
-[docs]: https://docs.rs/piawg
+[changelog]: https://github.com/fnichol/{{crate}}/blob/main/CHANGELOG.md
+[ci]: https://cirrus-ci.com/github/fnichol/{{crate}}
+[ci-staging]: https://cirrus-ci.com/github/fnichol/{{crate}}/staging
+[code-of-conduct]:
+  https://github.com/fnichol/{{crate}}/blob/main/CODE_OF_CONDUCT.md
+[crate]: https://crates.io/crates/{{crate}}
+[docker]: https://hub.docker.com/r/fnichol/{{crate}}
+[docs]: https://docs.rs/{{crate}}
 [fnichol]: https://github.com/fnichol
-[github]: https://github.com/fnichol/piawg
-[github-releases]: https://github.com/fnichol/piawg/releases
-[issues]: https://github.com/fnichol/piawg/issues
-[license]: https://github.com/fnichol/piawg/blob/main/LICENSE.txt
-[nightly]: https://github.com/fnichol/piawg/releases/tag/nightly
+[github]: https://github.com/fnichol/{{crate}}
+[github-releases]: https://github.com/fnichol/{{crate}}/releases
+[issues]: https://github.com/fnichol/{{crate}}/issues
+[license]: https://github.com/fnichol/{{crate}}/blob/main/LICENSE.txt
+[nightly]: https://github.com/fnichol/{{crate}}/releases/tag/nightly
