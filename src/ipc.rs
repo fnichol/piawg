@@ -5,7 +5,7 @@
 use crate::wg::{WGError, WgConfig, WgQuick};
 use futures::{SinkExt, StreamExt, TryStreamExt};
 use serde::{Deserialize, Serialize};
-use std::{process::Stdio, time::Duration};
+use std::{env, fmt, process::Stdio, time::Duration};
 use thiserror::Error;
 use tokio::{
     io::{AsyncWriteExt, Stdin, Stdout},
@@ -23,12 +23,44 @@ const TX_TIMEOUT_SECS: Duration = Duration::from_secs(5);
 
 #[derive(Debug, Error)]
 pub enum IpcError {
+    #[error("failed to consume the {0} stream for the child process")]
+    ChildIO(&'static str),
+    #[error("failed to spawn child process")]
+    ChildSpawn(#[source] std::io::Error),
+    #[error("failed to wait on child process")]
+    ChildWait(#[source] std::io::Error),
+    #[error("failed to determine path to current executable")]
+    CurrentExePath(#[source] std::io::Error),
+    #[error("invalid request message: {0:?}")]
+    InvalidMessageRequest(Request),
+    #[error("invalid response message: {0:?}")]
+    InvalidMessageReponse(Response),
+    #[error("read io error")]
+    ReadIO(#[source] std::io::Error),
+    #[error("read timeout")]
+    ReadTimeout(#[source] tokio::time::error::Elapsed),
+    #[error("send io error")]
+    SendIO(#[source] std::io::Error),
+    #[error("send timeout")]
+    SendTimeout(#[source] tokio::time::error::Elapsed),
+    #[error("error shutting down send stream")]
+    SendShutdown,
+    #[error("IPC stream closed before first message")]
+    StreamClosedOnStart,
+    #[error("IPC stream closed before reponse message was read")]
+    StreamClosedBeforeResponse,
     #[error("ipc wireguard error")]
     WG(#[from] WGError),
+    #[error("failed to write WireGuard configuration file: {0}")]
+    WGWriteConfig(ResponseError),
+    #[error("failed to bring WireGuard interface down: {0}")]
+    WGInterfaceDown(ResponseError),
+    #[error("failed to bring WireGuard interface up: {0}")]
+    WGInterfaceUp(ResponseError),
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-enum Request {
+pub enum Request {
     Start,
     WriteWgConfig(WgConfig),
     WgInterfaceUp,
@@ -37,8 +69,14 @@ enum Request {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-struct ResponseError {
+pub struct ResponseError {
     message: String,
+}
+
+impl fmt::Display for ResponseError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(&self.message)
+    }
 }
 
 impl From<IpcError> for ResponseError {
@@ -49,7 +87,7 @@ impl From<IpcError> for ResponseError {
     }
 }
 #[derive(Debug, Serialize, Deserialize)]
-enum Response {
+pub enum Response {
     Ready,
     WriteWgConfig(Result<(), ResponseError>),
     WgInterfaceUp(Result<(), ResponseError>),
@@ -75,82 +113,92 @@ pub struct InterfaceManagerClient {
 }
 
 impl InterfaceManagerClient {
-    pub async fn start() -> Result<Self, Box<dyn std::error::Error>> {
-        let mut child = Command::new(std::env::current_exe()?)
+    pub async fn start() -> Result<Self, IpcError> {
+        let current_exe = env::current_exe().map_err(IpcError::CurrentExePath)?;
+        let mut child = Command::new(current_exe)
             .arg("__wgctl__")
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
-            .spawn()?;
+            .spawn()
+            .map_err(IpcError::ChildSpawn)?;
         let mut rx = {
-            let stdout = child.stdout.take().expect("TODO: fix me");
+            let stdout = child.stdout.take().ok_or(IpcError::ChildIO("stdout"))?;
             let codec = FramedRead::new(stdout, LengthDelimitedCodec::new());
             SymmetricallyFramed::new(codec, SymmetricalJson::default())
         };
         let mut tx = {
-            let stdin = child.stdin.take().expect("TODO_ fix me");
+            let stdin = child.stdin.take().ok_or(IpcError::ChildIO("stdin"))?;
             let codec = FramedWrite::new(stdin, LengthDelimitedCodec::new());
             SymmetricallyFramed::new(codec, SymmetricalJson::default())
         };
 
-        time::timeout(Duration::from_secs(5), tx.send(Request::Start)).await??;
+        time::timeout(Duration::from_secs(5), tx.send(Request::Start))
+            .await
+            .map_err(IpcError::SendTimeout)?
+            .map_err(IpcError::SendIO)?;
         eprintln!("InterfaceManagerClient: sent Request::Start");
 
-        match time::timeout(Duration::from_secs(5), rx.try_next()).await?? {
+        match time::timeout(Duration::from_secs(5), rx.try_next())
+            .await
+            .map_err(IpcError::ReadTimeout)?
+            .map_err(IpcError::ReadIO)?
+        {
             Some(msg) => match msg {
                 Response::Ready => eprintln!("InterfaceManagerClient: get Response::Ready"),
-                invalid => panic!("TODO: invalid message: {:?}", invalid),
+                invalid => return Err(IpcError::InvalidMessageReponse(invalid)),
             },
-            None => panic!("TODO: stream closed before first message"),
+            None => return Err(IpcError::StreamClosedOnStart),
         };
 
         Ok(Self { child, rx, tx })
     }
 
-    pub async fn write_wg_config(
-        &mut self,
-        config: WgConfig,
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    pub async fn write_wg_config(&mut self, config: WgConfig) -> Result<(), IpcError> {
         match self.send(Request::WriteWgConfig(config)).await? {
-            Response::WriteWgConfig(result) => {
-                result.map_err(|err| panic!("TODO: failed to write config: {:?}", err))
-            }
-            invalid => panic!("TODO: invalid message: {:?}", invalid),
+            Response::WriteWgConfig(result) => result.map_err(IpcError::WGWriteConfig),
+            invalid => Err(IpcError::InvalidMessageReponse(invalid)),
         }
     }
 
-    pub async fn wg_interface_up(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+    pub async fn wg_interface_up(&mut self) -> Result<(), IpcError> {
         match self.send(Request::WgInterfaceUp).await? {
-            Response::WgInterfaceUp(result) => {
-                result.map_err(|err| panic!("TODO: failed to bring interface up: {:?}", err))
-            }
-            invalid => panic!("TODO: invalid message: {:?}", invalid),
+            Response::WgInterfaceUp(result) => result.map_err(IpcError::WGInterfaceUp),
+            invalid => Err(IpcError::InvalidMessageReponse(invalid)),
         }
     }
 
-    pub async fn wg_interface_down(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+    pub async fn wg_interface_down(&mut self) -> Result<(), IpcError> {
         match self.send(Request::WgInterfaceDown).await? {
-            Response::WgInterfaceDown(result) => {
-                result.map_err(|err| panic!("TODO: failed to bring interface down: {:?}", err))
-            }
-            invalid => panic!("TODO: invalid message: {:?}", invalid),
+            Response::WgInterfaceDown(result) => result.map_err(IpcError::WGInterfaceDown),
+            invalid => Err(IpcError::InvalidMessageReponse(invalid)),
         }
     }
 
-    pub async fn terminate(mut self) -> Result<(), Box<dyn std::error::Error>> {
+    pub async fn terminate(mut self) -> Result<(), IpcError> {
         match self.send(Request::Terminate).await? {
             Response::Terminated => (),
-            invalid => panic!("TODO: invalid message: {:?}", invalid),
+            invalid => return Err(IpcError::InvalidMessageReponse(invalid)),
         };
-        self.tx.into_inner().into_inner().shutdown().await?;
-        self.child.wait().await?;
+        self.tx
+            .into_inner()
+            .into_inner()
+            .shutdown()
+            .await
+            .map_err(|_| IpcError::SendShutdown)?;
+        self.child.wait().await.map_err(IpcError::ChildWait)?;
         Ok(())
     }
 
-    async fn send(&mut self, request: Request) -> Result<Response, Box<dyn std::error::Error>> {
-        time::timeout(TX_TIMEOUT_SECS, self.tx.send(request)).await??;
+    async fn send(&mut self, request: Request) -> Result<Response, IpcError> {
+        time::timeout(TX_TIMEOUT_SECS, self.tx.send(request))
+            .await
+            .map_err(IpcError::SendTimeout)?
+            .map_err(IpcError::SendIO)?;
         time::timeout(RX_TIMEOUT_SECS, self.rx.try_next())
-            .await??
-            .ok_or_else(|| panic!("TODO: stream closed before reading response message"))
+            .await
+            .map_err(IpcError::ReadTimeout)?
+            .map_err(IpcError::ReadIO)?
+            .ok_or(IpcError::StreamClosedBeforeResponse)
     }
 }
 
@@ -177,18 +225,25 @@ impl InterfaceManager {
         Self { rx, tx }
     }
 
-    pub async fn run(mut self) -> Result<(), Box<dyn std::error::Error>> {
-        match time::timeout(RX_TIMEOUT_SECS, self.rx.try_next()).await?? {
+    pub async fn run(mut self) -> Result<(), IpcError> {
+        match time::timeout(RX_TIMEOUT_SECS, self.rx.try_next())
+            .await
+            .map_err(IpcError::ReadTimeout)?
+            .map_err(IpcError::ReadIO)?
+        {
             Some(msg) => match msg {
                 Request::Start => eprintln!("InterfaceManager: got Request::Start"),
-                invalid => panic!("TODO: invalid message: {:?}", invalid),
+                invalid => return Err(IpcError::InvalidMessageRequest(invalid)),
             },
-            None => panic!("TODO: stream closed before reading start message"),
+            None => return Err(IpcError::StreamClosedOnStart),
         };
         self.send(Response::Ready).await?;
         eprintln!("InterfaceManager: sent Response::Ready");
 
-        while let Some(item) = time::timeout(RX_TIMEOUT_SECS, self.rx.next()).await? {
+        while let Some(item) = time::timeout(RX_TIMEOUT_SECS, self.rx.next())
+            .await
+            .map_err(IpcError::ReadTimeout)?
+        {
             let request = match item {
                 Ok(request) => request,
                 Err(err) => {
@@ -240,13 +295,21 @@ impl InterfaceManager {
             }
         }
 
-        self.tx.into_inner().into_inner().shutdown().await?;
+        self.tx
+            .into_inner()
+            .into_inner()
+            .shutdown()
+            .await
+            .map_err(|_| IpcError::SendShutdown)?;
         eprintln!("InterfaceManager: shutdown");
         Ok(())
     }
 
-    async fn send(&mut self, response: Response) -> Result<(), Box<dyn std::error::Error>> {
-        time::timeout(TX_TIMEOUT_SECS, self.tx.send(response)).await??;
+    async fn send(&mut self, response: Response) -> Result<(), IpcError> {
+        time::timeout(TX_TIMEOUT_SECS, self.tx.send(response))
+            .await
+            .map_err(IpcError::SendTimeout)?
+            .map_err(IpcError::SendIO)?;
         Ok(())
     }
 
