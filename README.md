@@ -271,7 +271,7 @@ licensed as above, without any additional terms or conditions.
   https://img.shields.io/github/downloads/fnichol/piawg/total.svg
 [badge-license]: https://img.shields.io/crates/l/piawg.svg?style=flat-square
 [badge-version]: https://img.shields.io/crates/v/piawg.svg?style=flat-square
-[bors-dashboard]: https://app.bors.tech/repositories/32089
+[bors-dashboard]: https://app.bors.tech/repositories/35002
 [changelog]: https://github.com/fnichol/piawg/blob/main/CHANGELOG.md
 [ci]: https://cirrus-ci.com/github/fnichol/piawg
 [ci-staging]: https://cirrus-ci.com/github/fnichol/piawg/staging

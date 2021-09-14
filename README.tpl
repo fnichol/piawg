@@ -234,7 +234,7 @@ licensed as above, without any additional terms or conditions.
   https://img.shields.io/github/downloads/fnichol/{{crate}}/total.svg
 [badge-license]: https://img.shields.io/crates/l/{{crate}}.svg?style=flat-square
 [badge-version]: https://img.shields.io/crates/v/{{crate}}.svg?style=flat-square
-[bors-dashboard]: https://app.bors.tech/repositories/32089
+[bors-dashboard]: https://app.bors.tech/repositories/35002
 [changelog]: https://github.com/fnichol/{{crate}}/blob/main/CHANGELOG.md
 [ci]: https://cirrus-ci.com/github/fnichol/{{crate}}
 [ci-staging]: https://cirrus-ci.com/github/fnichol/{{crate}}/staging
