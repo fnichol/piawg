@@ -36,11 +36,13 @@ pub enum WGError {
     #[error("command failed; exit={0}, stderr=\"{1}\"")]
     CommandFailed(i32, String),
     #[error("serializing wireguard config failed")]
-    ConfigSerialize(serde_ini::ser::Error),
+    ConfigSerialize(#[source] serde_ini::ser::Error),
     #[error("failed to create config file")]
-    ConfigFileCreate(std::io::Error),
+    ConfigFileCreate(#[source] std::io::Error),
+    #[error("failed to find parent directory of config file")]
+    ConfigFileParentDir,
     #[error("wireguard config io error")]
-    IO(std::io::Error),
+    IO(#[source] std::io::Error),
     #[error("program not found on PATH: {0}")]
     CommandNotFound(String),
     #[error("wireguard config not found; config_file={0}")]
@@ -216,7 +218,8 @@ impl WgQuick {
         config: &WgConfig,
     ) -> Result<Self, WGError> {
         let config_file = config_file.into();
-        fs::create_dir_all(config_file.parent().expect("parent dir should exist"))
+        let parent_dir = config_file.parent().ok_or(WGError::ConfigFileParentDir)?;
+        fs::create_dir_all(parent_dir)
             .await
             .map_err(WGError::ConfigFileCreate)?;
         let mut open_options = OpenOptions::new();
@@ -256,7 +259,8 @@ impl WgQuick {
             self.wg_quick_path.replace(find_program("wg-quick")?);
         }
 
-        Ok(self.wg_quick_path.as_ref().expect("wg_quick_path is set"))
+        // The `Option` is checked and set to `Some(_)` if `None` so unwrap is okay
+        Ok(self.wg_quick_path.as_ref().unwrap())
     }
 }
 
