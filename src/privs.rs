@@ -9,10 +9,10 @@ use thiserror::Error;
 
 #[derive(Debug, Error)]
 pub enum PrivError {
-    #[error("error finding group uid {0}: {1}")]
-    FindGroup(u32, nix::Error),
-    #[error("error finding user {0}: {1}")]
-    FindUser(String, nix::Error),
+    #[error("error finding group uid {0}")]
+    FindGroup(u32, #[source] nix::Error),
+    #[error("error finding user {0}")]
+    FindUser(String, #[source] nix::Error),
     #[error("group id not found and must exist: {0}")]
     GroupNotFound(u32),
     #[error("error dropping privileges: {0}")]
