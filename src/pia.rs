@@ -11,51 +11,51 @@ pub use client::{PIAToken, WireGuardAPI};
 #[derive(Debug, Error)]
 pub enum PIAError {
     #[error("cannot create pia addkey request")]
-    AddKeyRequest(hyper::http::Error),
+    AddKeyRequest(#[source] hyper::http::Error),
     #[error("response for pia addkey failed")]
-    AddKeyResponse(hyper::Error),
+    AddKeyResponse(#[source] hyper::Error),
     #[error("parsing pia addkey json response body failed")]
-    AddKeyResponseParse(serde_json::Error),
+    AddKeyResponseParse(#[source] serde_json::Error),
     #[error("pia addkey status was not okay; status={0}")]
     AddKeyResponseStatus(String),
     #[error("cannot create pia bindport request")]
-    BindPortRequest(hyper::http::Error),
+    BindPortRequest(#[source] hyper::http::Error),
     #[error("response for pia bindport failed")]
-    BindPortResponse(hyper::Error),
+    BindPortResponse(#[source] hyper::Error),
     #[error("parsing pia bindport json response body failed")]
-    BindPortResponseParse(serde_json::Error),
+    BindPortResponseParse(#[source] serde_json::Error),
     #[error("pia bindport status was not okay; status={0}")]
     BindPortResponseStatus(String),
     #[error("cannot create pia getsignature request")]
-    GetSignatureRequest(hyper::http::Error),
+    GetSignatureRequest(#[source] hyper::http::Error),
     #[error("response for pia getsignature failed")]
-    GetSignatureResponse(hyper::Error),
+    GetSignatureResponse(#[source] hyper::Error),
     #[error("parsing pia getsignature json response body failed")]
-    GetSignatureResponseParse(serde_json::Error),
+    GetSignatureResponseParse(#[source] serde_json::Error),
     #[error("response for pia getsignature payload failed")]
     GetSignatureResponsePayload(#[from] PayloadError),
     #[error("pia getsignature status was not okay; status={0}")]
     GetSignatureResponseStatus(String),
     #[error("cannot create pia gettoken request")]
-    GetTokenRequest(hyper::http::Error),
+    GetTokenRequest(#[source] hyper::http::Error),
     #[error("response for pia gettoken failed")]
-    GetTokenResponse(hyper::Error),
+    GetTokenResponse(#[source] hyper::Error),
     #[error("parsing pia gettoken json response body failed")]
-    GetTokenResponseParse(serde_json::Error),
+    GetTokenResponseParse(#[source] serde_json::Error),
     #[error("cannot create pia getregions request")]
-    GetWGRegionsRequest(hyper::http::Error),
+    GetWGRegionsRequest(#[source] hyper::http::Error),
     #[error("response for pia getregions failed")]
-    GetWGRegionsResponse(hyper::Error),
+    GetWGRegionsResponse(#[source] hyper::Error),
     #[error("parsing pia getregions json response body failed")]
-    GetWGRegionsResponseParse(serde_json::Error),
+    GetWGRegionsResponseParse(#[source] serde_json::Error),
     #[error("reading response body failed")]
-    ReadResponseBody(hyper::Error),
+    ReadResponseBody(#[source] hyper::Error),
     #[error("region not found; region_id={0}")]
     RegionNotFound(String),
     #[error("server vip not set, add_key must be called first")]
     ServerVipNotSet,
     #[error("error parsing pia wireguard api uri")]
-    InvalidUri(hyper::http::uri::InvalidUri),
+    InvalidUri(#[source] hyper::http::uri::InvalidUri),
 }
 
 #[derive(Debug, Error)]
