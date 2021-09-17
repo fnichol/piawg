@@ -7,7 +7,9 @@ use std::env::args;
 mod cli;
 
 #[tokio::main]
-async fn main() {
+async fn main() -> color_eyre::Result<()> {
+    color_eyre::install()?;
+
     match args().nth(1).as_deref() {
         #[cfg(feature = "ipc")]
         Some("__wgctl__") => cmd::wgctl(cli::parse_wgctl()).await,
@@ -16,92 +18,97 @@ async fn main() {
 }
 
 mod cmd {
+    use color_eyre::eyre::{eyre, WrapErr};
     use piawg::{
         pia::WireGuardAPI,
         wg::{self, WgConfig},
         InterfaceManagerClient,
     };
 
-    pub(crate) async fn run(args: crate::cli::Args) {
+    pub(crate) async fn run(args: crate::cli::Args) -> color_eyre::Result<()> {
         // In a real application, use the `log` framework or something similar. In this example
         // case, we'll do this which avoids more dependencies for one call.
         if args.verbose > 0 {
             eprintln!("[debug] parsed cli arguments; args={:?}", args);
         }
 
-        let username = std::env::var("PIA_USER").expect("PIA_USER is required");
-        let password = std::env::var("PIA_PASS").expect("PIA_USER is required");
+        let username = std::env::var("PIA_USER").wrap_err("TODO: PIA_USER is required")?;
+        let password = std::env::var("PIA_PASS").wrap_err("TODO: PIA_USER is required")?;
+        let region_id = "ca_vancouver";
 
         #[cfg(all(unix, feature = "checkroot"))]
         if !piawg::checkroot::is_root() {
-            panic!("TODO: you must run this program as root");
+            return Err(eyre!("you must run this program with root privileges"));
         }
 
         let mut interface_manager = InterfaceManagerClient::start()
             .await
-            .expect("failed to start interface manager");
+            .wrap_err("failed to start the WireGuard interface manager")?;
 
         #[cfg(all(unix, feature = "privs", feature = "ipc"))]
         piawg::privs::privdrop(piawg::privs::PrivDropInfo::new("nobody"))
-            .expect("failed to drop privs");
+            .wrap_err("failed to drop privs")?;
 
-        let region = WireGuardAPI::get_region("ca_vancouver")
+        let region = WireGuardAPI::get_region(region_id)
             .await
-            .expect("failed to get region");
-        dbg!(&region);
+            .wrap_err_with(|| format!("failed to get a PIA region for id: {}", region_id))?;
+        let mut api = WireGuardAPI::for_region(&region).wrap_err_with(|| {
+            format!(
+                "failed to create a PIA API instance for region id: {}",
+                region_id
+            )
+        })?;
 
         let token = WireGuardAPI::get_token(username, password)
             .await
-            .expect("failed to get_token");
-        dbg!(&token);
+            .wrap_err("failed to get a PIA token")?;
 
         let (secret_key, public_key) = wg::generate_keypair();
-
-        let mut api = WireGuardAPI::for_region(&region).expect("failed to create api");
 
         let akr = api
             .add_key(&token, &public_key)
             .await
-            .expect("failed to add key");
-        dbg!(&akr);
+            .wrap_err("failed to add public key to API")?;
+
         let config = WgConfig::from(akr, secret_key);
-        dbg!(&config);
 
         interface_manager
             .write_wg_config(config)
             .await
-            .expect("failed to write config");
-        println!("written out: pia.conf");
+            .wrap_err("failed to write the WireGuard configuration")?;
 
         interface_manager
             .wg_interface_up()
             .await
-            .expect("failed to bring interface up");
+            .wrap_err("failed to bring up the WireGuard interface")?;
 
         interface_manager
             .terminate()
             .await
-            .expect("failed to terminate interface manager");
+            .wrap_err("failed to terminate the WireGuard interface manager")?;
 
         let gsr = api
             .get_signature(&token)
             .await
-            .expect("failed to get signature");
+            .wrap_err("failed to get a PIA signature to setup port forwarding")?;
         dbg!(&gsr);
 
         let bind_port = api
             .bind_port(gsr.payload_raw(), &gsr.signature)
             .await
-            .expect("failed to bind port");
-        dbg!(&bind_port);
+            .wrap_err("failed to bind port for port forwarding")?;
+        dbg!(bind_port);
+
+        Ok(())
     }
 
     #[cfg(feature = "ipc")]
-    pub(crate) async fn wgctl(_args: crate::cli::WgctlArgs) {
+    pub(crate) async fn wgctl(_args: crate::cli::WgctlArgs) -> color_eyre::Result<()> {
         use tokio::io;
+
         piawg::ipc::InterfaceManager::new(io::stdin(), io::stdout())
             .run()
             .await
-            .expect("manager failed to continue running");
+            .wrap_err("the WireGuard interface manager failed to run to completion")
     }
 }

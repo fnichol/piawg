@@ -20,7 +20,7 @@ default = ["application"]
 # Should be disabled when depending on the crate as a library. For example, to
 # use as a library in a Cargo.toml: `piawg = { version = "...",
 # default-features = false }`
-application = ["clap", "privs"]
+application = ["clap", "color-eyre", "privs"]
 
 # Adds simple IPC between a privileged child process which manages the
 # WireGuard interface and configuration writing. Used in the CLI application.
@@ -40,6 +40,7 @@ checkroot = ["nix"]
 base64 = "0.13.0"
 chrono = "0.4.19"
 clap = { version = "=3.0.0-beta.2", optional = true }
+color-eyre = { version = "0.5.11", optional = true }
 futures = { version = "0.3.16", optional = true }
 hyper = { version = "0.14.10", default-features = false, features = ["http1", "http2", "client", "runtime"] }
 hyper-rustls = { version = "0.22.1" }
