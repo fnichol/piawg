@@ -182,7 +182,7 @@ anchors:
 #
 env:
   RUST_VERSION: stable
-  MIN_SUPPORTED_RUST_VERSION: 1.53.0 # Due to use of `DebugStruct.finish_non_exhaustive`
+  MIN_SUPPORTED_RUST_VERSION: 1.54.0 # Due to use of `#![doc = include_str!("../README.md")]` used in `clap-3.0.0.beta.4`
 
 check_task:
   name: check
