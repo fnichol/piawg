@@ -25,7 +25,7 @@ use std::{
     str::FromStr,
 };
 
-const GENERATE_TOKEN_URL: &str = "https://privateinternetaccess.com/gtoken/generateToken";
+const GENERATE_TOKEN_URL: &str = "https://www.privateinternetaccess.com/gtoken/generateToken";
 const GET_REGIONS_URL: &str = "https://serverlist.piaservers.net/vpninfo/servers/v6";
 const API_ADD_KEY_PORT: u16 = 1337;
 const API_GET_SIGNATURE_PORT: u16 = 19999;
