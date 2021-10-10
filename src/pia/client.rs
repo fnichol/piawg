@@ -64,7 +64,7 @@ impl WireGuardAPI {
         token: &PIAToken,
         public_key: &PublicKey,
     ) -> Result<AddKeyResponse, PIAError> {
-        let req = Request::builder()
+        let request = Request::builder()
             .method(Method::GET)
             .uri(format!(
                 "{}:{}/addKey?pt={}&pubkey={}",
@@ -76,11 +76,11 @@ impl WireGuardAPI {
             .body(Body::empty())
             .map_err(PIAError::AddKeyRequest)?;
         let socket_addr = SocketAddr::new(self.server, API_ADD_KEY_PORT);
-        let res = http::https_client_with_custom_sni_and_ca(PIA_CA, socket_addr)
-            .request(req)
+        let response = http::https_client_with_custom_sni_and_ca(PIA_CA, socket_addr)
+            .request(request)
             .await
             .map_err(PIAError::AddKeyResponse)?;
-        let body = body::aggregate(res)
+        let body = body::aggregate(response)
             .await
             .map_err(PIAError::ReadResponseBody)?;
         let add_key_response: AddKeyResponse =
@@ -96,7 +96,7 @@ impl WireGuardAPI {
     pub async fn get_signature(&self, token: &PIAToken) -> Result<GetSignatureResponse, PIAError> {
         let server_vip = self.server_vip.ok_or(PIAError::ServerVipNotSet)?;
 
-        let req = Request::builder()
+        let request = Request::builder()
             .method(Method::GET)
             .uri(format!(
                 "{}:{}/getSignature?token={}",
@@ -107,11 +107,11 @@ impl WireGuardAPI {
             .body(Default::default())
             .map_err(PIAError::GetSignatureRequest)?;
         let socket_addr = SocketAddr::new(server_vip, API_GET_SIGNATURE_PORT);
-        let res = http::https_client_with_custom_sni_and_ca(PIA_CA, socket_addr)
-            .request(req)
+        let response = http::https_client_with_custom_sni_and_ca(PIA_CA, socket_addr)
+            .request(request)
             .await
             .map_err(PIAError::GetSignatureResponse)?;
-        let body = body::aggregate(res)
+        let body = body::aggregate(response)
             .await
             .map_err(PIAError::ReadResponseBody)?;
         let get_signature_response_raw: GetSignatureResponseRaw =
@@ -132,7 +132,7 @@ impl WireGuardAPI {
     ) -> Result<BindPortResponse, PIAError> {
         let server_vip = self.server_vip.ok_or(PIAError::ServerVipNotSet)?;
 
-        let req = Request::builder()
+        let request = Request::builder()
             .method(Method::GET)
             .uri(format!(
                 "{}:{}/bindPort?payload={}&signature={}",
@@ -144,11 +144,11 @@ impl WireGuardAPI {
             .body(Default::default())
             .map_err(PIAError::BindPortRequest)?;
         let socket_addr = SocketAddr::new(server_vip, API_BIND_PORT_PORT);
-        let res = http::https_client_with_custom_sni_and_ca(PIA_CA, socket_addr)
-            .request(req)
+        let response = http::https_client_with_custom_sni_and_ca(PIA_CA, socket_addr)
+            .request(request)
             .await
             .map_err(PIAError::BindPortResponse)?;
-        let body = body::aggregate(res)
+        let body = body::aggregate(response)
             .await
             .map_err(PIAError::ReadResponseBody)?;
         let bind_port_response: BindPortResponse =
@@ -164,7 +164,7 @@ impl WireGuardAPI {
         pia_username: impl AsRef<str>,
         pia_password: impl AsRef<str>,
     ) -> Result<PIAToken, PIAError> {
-        let req = Request::builder()
+        let request = Request::builder()
             .method(Method::GET)
             .uri(GENERATE_TOKEN_URL)
             .header(
@@ -173,11 +173,11 @@ impl WireGuardAPI {
             )
             .body(Body::empty())
             .map_err(PIAError::GetTokenRequest)?;
-        let res = http::https_client_native_roots()
-            .request(req)
+        let response = http::https_client_native_roots()
+            .request(request)
             .await
             .map_err(PIAError::GetTokenResponse)?;
-        let body = body::aggregate(res)
+        let body = body::aggregate(response)
             .await
             .map_err(PIAError::ReadResponseBody)?;
         let get_token_response: GetTokenResponse =
@@ -187,16 +187,16 @@ impl WireGuardAPI {
     }
 
     pub async fn get_regions() -> Result<Regions, PIAError> {
-        let req = Request::builder()
+        let request = Request::builder()
             .method(Method::GET)
             .uri(GET_REGIONS_URL)
             .body(Body::empty())
             .map_err(PIAError::GetWGRegionsRequest)?;
-        let res = http::https_client_native_roots()
-            .request(req)
+        let response = http::https_client_native_roots()
+            .request(request)
             .await
             .map_err(PIAError::GetWGRegionsResponse)?;
-        let body = body::aggregate(res)
+        let body = body::aggregate(response)
             .await
             .map_err(PIAError::ReadResponseBody)?
             .reader()
