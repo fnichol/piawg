@@ -104,7 +104,7 @@ impl WireGuardAPI {
                 API_GET_SIGNATURE_PORT,
                 urlencoding::encode(token.as_str()),
             ))
-            .body(Default::default())
+            .body(Body::default())
             .map_err(PIAError::GetSignatureRequest)?;
         let socket_addr = SocketAddr::new(server_vip, API_GET_SIGNATURE_PORT);
         let response = http::https_client_with_custom_sni_and_ca(PIA_CA, socket_addr)
@@ -141,7 +141,7 @@ impl WireGuardAPI {
                 urlencoding::encode(payload.as_str()),
                 urlencoding::encode(signature.as_str()),
             ))
-            .body(Default::default())
+            .body(Body::default())
             .map_err(PIAError::BindPortRequest)?;
         let socket_addr = SocketAddr::new(server_vip, API_BIND_PORT_PORT);
         let response = http::https_client_with_custom_sni_and_ca(PIA_CA, socket_addr)
