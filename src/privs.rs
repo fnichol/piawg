@@ -48,7 +48,7 @@ impl<'a, 'b, 'c> PrivDropInfo<'a, 'b, 'c> {
     }
 }
 
-pub fn privdrop(info: PrivDropInfo<'_, '_, '_>) -> Result<(), PrivError> {
+pub fn privdrop(info: &PrivDropInfo<'_, '_, '_>) -> Result<(), PrivError> {
     let user_name = match info.user_name {
         Some(user_name) => Cow::from(user_name),
         None => Cow::from(determine_user(info.default_user_name)),

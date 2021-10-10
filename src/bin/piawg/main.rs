@@ -47,7 +47,7 @@ mod cmd {
             .wrap_err("failed to start the WireGuard interface manager")?;
 
         #[cfg(all(unix, feature = "privs", feature = "ipc"))]
-        piawg::privs::privdrop(piawg::privs::PrivDropInfo::new("nobody"))
+        piawg::privs::privdrop(&piawg::privs::PrivDropInfo::new("nobody"))
             .wrap_err("failed to drop privs")?;
 
         let region = WireGuardAPI::get_region(region_id)
