@@ -19,6 +19,7 @@ async fn main() -> color_eyre::Result<()> {
 
 mod cmd {
     use color_eyre::eyre::{eyre, WrapErr};
+
     use piawg::{
         pia::WireGuardAPI,
         wg::{self, WgConfig},

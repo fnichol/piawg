@@ -2,12 +2,6 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
-use crate::pia::client::AddKeyResponse;
-use base64::encode_config;
-use ipnet::IpNet;
-use rand_core::OsRng;
-use serde::{Deserialize, Serialize};
-use serde_with::skip_serializing_none;
 use std::{
     convert::Infallible,
     env,
@@ -18,6 +12,12 @@ use std::{
     process::Stdio,
     str::FromStr,
 };
+
+use base64::encode_config;
+use ipnet::IpNet;
+use rand_core::OsRng;
+use serde::{Deserialize, Serialize};
+use serde_with::skip_serializing_none;
 use thiserror::Error;
 use tokio::{
     fs::{self, OpenOptions},
@@ -26,6 +26,8 @@ use tokio::{
 };
 use typed_builder::TypedBuilder;
 use x25519_dalek::{PublicKey as InnerPublicKey, StaticSecret};
+
+use crate::pia::client::AddKeyResponse;
 
 const CONFIG_FILE_PREFIX: &str = "/etc/wireguard";
 

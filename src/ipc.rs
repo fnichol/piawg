@@ -2,10 +2,10 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
-use crate::wg::{WGError, WgConfig, WgQuick};
+use std::{env, fmt, process::Stdio, time::Duration};
+
 use futures::{SinkExt, StreamExt, TryStreamExt};
 use serde::{Deserialize, Serialize};
-use std::{env, fmt, process::Stdio, time::Duration};
 use thiserror::Error;
 use tokio::{
     io::{AsyncWriteExt, Stdin, Stdout},
@@ -17,6 +17,8 @@ use tokio_serde::{
     Framed, SymmetricallyFramed,
 };
 use tokio_util::codec::{FramedRead, FramedWrite, LengthDelimitedCodec};
+
+use crate::wg::{WGError, WgConfig, WgQuick};
 
 const RX_TIMEOUT_SECS: Duration = Duration::from_secs(5);
 const TX_TIMEOUT_SECS: Duration = Duration::from_secs(5);

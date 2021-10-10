@@ -2,19 +2,6 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
-use super::{PIAError, PayloadError};
-use crate::{
-    http,
-    wg::{PublicKey, ServerKey},
-};
-use base64::decode_config;
-use chrono::{DateTime, FixedOffset};
-use hyper::{
-    body::{self, Buf},
-    Body, Method, Request, Uri,
-};
-use serde::{de, Deserialize, Deserializer, Serialize};
-use serde_with::{serde_as, DisplayFromStr};
 use std::{
     collections::HashMap,
     convert::{Infallible, TryFrom, TryInto},
@@ -23,6 +10,21 @@ use std::{
     net::IpAddr,
     net::SocketAddr,
     str::FromStr,
+};
+
+use base64::decode_config;
+use chrono::{DateTime, FixedOffset};
+use hyper::{
+    body::{self, Buf},
+    Body, Method, Request, Uri,
+};
+use serde::{de, Deserialize, Deserializer, Serialize};
+use serde_with::{serde_as, DisplayFromStr};
+
+use super::{PIAError, PayloadError};
+use crate::{
+    http,
+    wg::{PublicKey, ServerKey},
 };
 
 const GENERATE_TOKEN_URL: &str = "https://www.privateinternetaccess.com/gtoken/generateToken";

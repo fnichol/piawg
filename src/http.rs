@@ -2,13 +2,6 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
-use base64::write::EncoderWriter;
-use hyper::{
-    client::{connect::dns::Name, HttpConnector},
-    Body, Client,
-};
-use hyper_rustls::HttpsConnector;
-use rustls::ClientConfig;
 use std::{
     future::Future,
     io::{BufReader, Write},
@@ -17,6 +10,14 @@ use std::{
     task::Poll,
     vec,
 };
+
+use base64::write::EncoderWriter;
+use hyper::{
+    client::{connect::dns::Name, HttpConnector},
+    Body, Client,
+};
+use hyper_rustls::HttpsConnector;
+use rustls::ClientConfig;
 use tower::Service;
 
 pub(crate) fn https_client_native_roots() -> Client<HttpsConnector<HttpConnector>, Body> {

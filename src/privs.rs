@@ -2,9 +2,10 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
+use std::{borrow::Cow, env};
+
 use nix::unistd::{Group, User};
 use privdrop::PrivDrop;
-use std::{borrow::Cow, env};
 use thiserror::Error;
 
 #[derive(Debug, Error)]
