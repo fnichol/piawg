@@ -267,7 +267,7 @@ impl InterfaceManager {
                             Err(err.into())
                         }
                     };
-                    self.send(Response::WgInterfaceUp(result)).await?
+                    self.send(Response::WgInterfaceUp(result)).await?;
                 }
                 Request::WgInterfaceDown => {
                     let result = match Self::wg_interface_down().await {
@@ -277,7 +277,7 @@ impl InterfaceManager {
                             Err(err.into())
                         }
                     };
-                    self.send(Response::WgInterfaceDown(result)).await?
+                    self.send(Response::WgInterfaceDown(result)).await?;
                 }
                 Request::WriteWgConfig(config) => {
                     let result = match Self::write_wg_config(&config).await {
@@ -287,7 +287,7 @@ impl InterfaceManager {
                             Err(err.into())
                         }
                     };
-                    self.send(Response::WriteWgConfig(result)).await?
+                    self.send(Response::WriteWgConfig(result)).await?;
                 }
                 Request::Terminate => {
                     eprintln!("InterfaceManager: shutting down");
