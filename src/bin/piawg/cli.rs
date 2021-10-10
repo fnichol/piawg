@@ -29,7 +29,7 @@ pub(crate) fn parse_wgctl() -> WgctlArgs {
 ///
 /// TODO(fnichol): fill in
 ///
-/// Project home page: https://github.com/fnichol/piawg
+/// Project home page: <https://github.com/fnichol/piawg>
 #[derive(Clap, Debug)]
 #[clap(
     global_setting = AppSettings::ColoredHelp,
