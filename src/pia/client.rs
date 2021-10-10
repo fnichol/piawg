@@ -313,7 +313,7 @@ impl From<GetRegionsResponse> for Regions {
             .regions
             .into_iter()
             .filter_map(|region| {
-                if let Some(server) = region
+                match region
                     .servers
                     .into_iter()
                     .find(|(key, _)| key == "wg")
@@ -324,21 +324,22 @@ impl From<GetRegionsResponse> for Regions {
                     })
                     .flatten()
                 {
-                    let wg_region = Region {
-                        id: region.id.clone(),
-                        name: region.name,
-                        country: region.country,
-                        auto_region: region.auto_region,
-                        dns: region.dns,
-                        port_forward: region.port_forward,
-                        geo: region.geo,
-                        server_ip: server.ip,
-                        server_cn: server.cn,
-                    };
+                    Some(server) => {
+                        let wg_region = Region {
+                            id: region.id.clone(),
+                            name: region.name,
+                            country: region.country,
+                            auto_region: region.auto_region,
+                            dns: region.dns,
+                            port_forward: region.port_forward,
+                            geo: region.geo,
+                            server_ip: server.ip,
+                            server_cn: server.cn,
+                        };
 
-                    Some((region.id, wg_region))
-                } else {
-                    None
+                        Some((region.id, wg_region))
+                    }
+                    None => None,
                 }
             })
             .collect();
