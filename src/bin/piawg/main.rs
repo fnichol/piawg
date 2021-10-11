@@ -19,6 +19,7 @@ async fn main() -> color_eyre::Result<()> {
         Some(_) | None => match args::parse() {
             Args::Config { sub } => match sub {
                 ConfigArgs::Export(args) => cmd::config::export(args).await,
+                ConfigArgs::Get(args) => cmd::config::get(args).await,
                 ConfigArgs::Import(args) => cmd::config::import(args).await,
             },
             Args::Region { sub } => match sub {

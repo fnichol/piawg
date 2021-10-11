@@ -3,6 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
 use clap::{AppSettings, Clap};
+use piawg::server::Config;
 
 const AFTER_HELP: &str =
     "Note: Use `-h` for a short and concise overview and `--help` for full usage.";
@@ -62,8 +63,9 @@ pub(crate) enum Args {
 ///
 /// TODO(fnichol): fill in
 #[derive(Clap, Debug)]
-pub enum ConfigArgs {
+pub(crate) enum ConfigArgs {
     Export(ConfigExportArgs),
+    Get(ConfigGetArgs),
     Import(ConfigImportArgs),
 }
 
@@ -71,19 +73,28 @@ pub enum ConfigArgs {
 ///
 /// TODO(fnichol): fill in
 #[derive(Clap, Debug)]
-pub struct ConfigExportArgs {}
+pub(crate) struct ConfigExportArgs {}
+
+/// Gets a value from the service configuration.
+///
+/// TODO(fnichol): fill in
+#[derive(Clap, Debug)]
+pub(crate) struct ConfigGetArgs {
+    #[clap(possible_values = Config::KEYS)]
+    pub(crate) key: String,
+}
 
 /// Imports the service configuration.
 ///
 /// TODO(fnichol): fill in
 #[derive(Clap, Debug)]
-pub struct ConfigImportArgs {}
+pub(crate) struct ConfigImportArgs {}
 
 /// Manages the Private Internet Access regions.
 ///
 /// TODO(fnichol): fill in
 #[derive(Clap, Debug)]
-pub enum RegionArgs {
+pub(crate) enum RegionArgs {
     Get(RegionGetArgs),
     List(RegionListArgs),
 }
@@ -92,19 +103,19 @@ pub enum RegionArgs {
 ///
 /// TODO(fnichol): fill in
 #[derive(Clap, Debug)]
-pub struct RegionGetArgs {}
+pub(crate) struct RegionGetArgs {}
 
 /// Lists the Private Internet Access regions.
 ///
 /// TODO(fnichol): fill in
 #[derive(Clap, Debug)]
-pub struct RegionListArgs {}
+pub(crate) struct RegionListArgs {}
 
 /// Runs the piawg service
 ///
 /// TODO(fnichol): fill in
 #[derive(Clap, Debug)]
-pub struct RunArgs {
+pub(crate) struct RunArgs {
     /// Sets the verbosity mode.
     ///
     /// Multiple -v options increase verbosity. The maximum is 3.
@@ -116,7 +127,7 @@ pub struct RunArgs {
 ///
 /// TODO(fnichol): fill in
 #[derive(Clap, Debug)]
-pub enum WireguardArgs {
+pub(crate) enum WireguardArgs {
     Down(WireguardDownArgs),
 }
 
@@ -124,7 +135,7 @@ pub enum WireguardArgs {
 ///
 /// TODO(fnichol): fill in
 #[derive(Clap, Debug)]
-pub struct WireguardDownArgs {}
+pub(crate) struct WireguardDownArgs {}
 
 #[derive(Clap, Debug)]
 #[clap(

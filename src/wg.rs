@@ -313,8 +313,9 @@ async fn run(command: &mut Command) -> Result<(), WGError> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use indoc::indoc;
+
+    use super::*;
 
     #[tokio::test]
     async fn serializes() {

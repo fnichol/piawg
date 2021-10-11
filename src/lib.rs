@@ -32,6 +32,7 @@ mod noipc;
 pub mod pia;
 #[cfg(all(unix, feature = "privs"))]
 pub mod privs;
+pub mod server;
 pub mod wg;
 
 const INTERFACE: &str = "pia";

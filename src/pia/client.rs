@@ -219,7 +219,7 @@ impl WireGuardAPI {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct PIAToken(String);
 
 impl PIAToken {
