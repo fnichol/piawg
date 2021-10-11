@@ -25,7 +25,7 @@ pub(crate) fn parse_wgctl() -> WgctlArgs {
     Wgctl::parse().into()
 }
 
-/// TODO(fnichol): fill in
+/// Private Internet Access WireGuard Service
 ///
 /// TODO(fnichol): fill in
 ///
@@ -33,21 +33,98 @@ pub(crate) fn parse_wgctl() -> WgctlArgs {
 #[derive(Clap, Debug)]
 #[clap(
     global_setting = AppSettings::ColoredHelp,
+    global_setting = AppSettings::DisableVersionForSubcommands,
     global_setting = AppSettings::UnifiedHelpMessage,
     max_term_width = 100,
-    author = concat!("\nAuthor: ", env!("CARGO_PKG_AUTHORS"), "\n\n"),
+    author = concat!("Author: ", env!("CARGO_PKG_AUTHORS"), "\n\n"),
     version = env!("CARGO_PKG_VERSION"),
     long_version = env!("CARGO_PKG_VERSION"),
     after_help = AFTER_HELP,
     after_long_help = AFTER_LONG_HELP,
 )]
-pub(crate) struct Args {
+pub(crate) enum Args {
+    Config {
+        #[clap(subcommand)]
+        sub: ConfigArgs,
+    },
+    Region {
+        #[clap(subcommand)]
+        sub: RegionArgs,
+    },
+    Run(RunArgs),
+    Wireguard {
+        #[clap(subcommand)]
+        sub: WireguardArgs,
+    },
+}
+
+/// Configures the piawg service.
+///
+/// TODO(fnichol): fill in
+#[derive(Clap, Debug)]
+pub enum ConfigArgs {
+    Export(ConfigExportArgs),
+    Import(ConfigImportArgs),
+}
+
+/// Exports the service configuration.
+///
+/// TODO(fnichol): fill in
+#[derive(Clap, Debug)]
+pub struct ConfigExportArgs {}
+
+/// Imports the service configuration.
+///
+/// TODO(fnichol): fill in
+#[derive(Clap, Debug)]
+pub struct ConfigImportArgs {}
+
+/// Manages the Private Internet Access regions.
+///
+/// TODO(fnichol): fill in
+#[derive(Clap, Debug)]
+pub enum RegionArgs {
+    Get(RegionGetArgs),
+    List(RegionListArgs),
+}
+
+/// Gets information for a Private Internet Access region.
+///
+/// TODO(fnichol): fill in
+#[derive(Clap, Debug)]
+pub struct RegionGetArgs {}
+
+/// Lists the Private Internet Access regions.
+///
+/// TODO(fnichol): fill in
+#[derive(Clap, Debug)]
+pub struct RegionListArgs {}
+
+/// Runs the piawg service
+///
+/// TODO(fnichol): fill in
+#[derive(Clap, Debug)]
+pub struct RunArgs {
     /// Sets the verbosity mode.
     ///
     /// Multiple -v options increase verbosity. The maximum is 3.
     #[clap(short = 'v', long = "verbose", parse(from_occurrences))]
     pub(crate) verbose: usize,
 }
+
+/// Manages the PIA WireGuard interface.
+///
+/// TODO(fnichol): fill in
+#[derive(Clap, Debug)]
+pub enum WireguardArgs {
+    Down(WireguardDownArgs),
+}
+
+/// Brings the PIA WireGuard interface down.
+///
+/// TODO(fnichol): fill in
+#[derive(Clap, Debug)]
+pub struct WireguardDownArgs {}
 
 #[derive(Clap, Debug)]
 #[clap(
