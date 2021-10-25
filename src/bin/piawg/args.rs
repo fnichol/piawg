@@ -118,7 +118,7 @@ pub(crate) struct RegionListArgs {}
 pub(crate) struct RunArgs {
     /// Sets the verbosity mode.
     ///
-    /// Multiple -v options increase verbosity. The maximum is 3.
+    /// Multiple -v options increase verbosity. The maximum is 4.
     #[clap(short = 'v', long = "verbose", parse(from_occurrences))]
     pub(crate) verbose: usize,
 }
@@ -149,7 +149,10 @@ pub(crate) enum Wgctl {
 }
 
 #[derive(Clap, Debug)]
-pub(crate) struct WgctlArgs {}
+pub(crate) struct WgctlArgs {
+    #[clap(short = 'v', long = "verbose", parse(from_occurrences))]
+    pub(crate) verbose: usize,
+}
 
 impl From<Wgctl> for WgctlArgs {
     fn from(val: Wgctl) -> Self {

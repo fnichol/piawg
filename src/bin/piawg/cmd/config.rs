@@ -1,10 +1,11 @@
-use color_eyre::{eyre::eyre, Result};
+use color_eyre::Result;
 use piawg::server::Config;
 use tokio::io::{stdin, stdout, AsyncWriteExt};
 
-use crate::args::{ConfigExportArgs, ConfigGetArgs, ConfigImportArgs};
-
-const CONFIG_FILE_PATH: &str = "/etc/piawg/config.json";
+use crate::{
+    args::{ConfigExportArgs, ConfigGetArgs, ConfigImportArgs},
+    CONFIG_FILE_PATH,
+};
 
 pub(crate) async fn get(args: ConfigGetArgs) -> Result<()> {
     need_root()?;
@@ -18,12 +19,12 @@ pub(crate) async fn get(args: ConfigGetArgs) -> Result<()> {
         "privdrop_user" => {
             stdout()
                 .write_all(config.privdrop_user().as_bytes())
-                .await?
+                .await?;
         }
         "port_forward" => {
             stdout()
                 .write_all(format!("{:?}", config.port_forward()).as_bytes())
-                .await?
+                .await?;
         }
         invalid => unimplemented!("no config key: {}", invalid,),
     }
@@ -58,7 +59,9 @@ pub(crate) async fn import(_args: ConfigImportArgs) -> Result<()> {
 pub fn need_root() -> Result<()> {
     #[cfg(all(unix, feature = "checkroot"))]
     if !piawg::checkroot::is_root() {
-        return Err(eyre!("you must run this program with root privileges"));
+        return Err(color_eyre::eyre::eyre!(
+            "you must run this program with root privileges"
+        ));
     }
     Ok(())
 }

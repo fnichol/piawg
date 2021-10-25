@@ -1,100 +1,91 @@
-use color_eyre::eyre::{eyre, WrapErr};
+use color_eyre::{eyre::WrapErr, Result};
+use piawg::server::{Config, FileStateStore, Server};
+use tracing::{debug, trace};
 
-use piawg::{
-    pia::WireGuardAPI,
-    wg::{self, WgConfig},
-    InterfaceManagerClient,
-};
-
-use crate::args::{RunArgs, WgctlArgs};
+use crate::{args::RunArgs, CONFIG_FILE_PATH, STATE_FILE_PATH};
 
 pub(crate) mod config;
 pub(crate) mod region;
 pub(crate) mod wireguard;
 
-pub(crate) async fn run(args: RunArgs) -> color_eyre::Result<()> {
-    // In a real application, use the `log` framework or something similar. In this
-    // example case, we'll do this which avoids more dependencies for one call.
+pub(crate) async fn run(args: RunArgs, mut telemetry: piawg::telemetry::Client) -> Result<()> {
     if args.verbose > 0 {
-        eprintln!("[debug] parsed cli arguments; args={:?}", args);
+        telemetry.set_verbosity(args.verbose.into()).await?;
     }
-
-    let username = std::env::var("PIA_USER").wrap_err("TODO: PIA_USER is required")?;
-    let password = std::env::var("PIA_PASS").wrap_err("TODO: PIA_USER is required")?;
-    let region_id = "ca_vancouver";
+    debug!(arguments = ?args, "parsed cli arguments");
 
     #[cfg(all(unix, feature = "checkroot"))]
     if !piawg::checkroot::is_root() {
-        return Err(eyre!("you must run this program with root privileges"));
+        return Err(color_eyre::eyre::eyre!(
+            "you must run this program with root privileges"
+        ));
     }
 
-    let mut interface_manager = InterfaceManagerClient::start()
+    let config = Config::load(CONFIG_FILE_PATH)
         .await
-        .wrap_err("failed to start the WireGuard interface manager")?;
+        .wrap_err("failed to load config")?;
+    let state_store = FileStateStore::new(STATE_FILE_PATH, config.privdrop_user())
+        .wrap_err("failed to initialize state store")?;
 
-    #[cfg(all(unix, feature = "privs", feature = "ipc"))]
-    piawg::privs::privdrop(&piawg::privs::PrivDropInfo::new("nobody"))
-        .wrap_err("failed to drop privs")?;
+    #[cfg(unix)]
+    crate::telemetry::start_tracing_level_signal_handler_task(&telemetry)?;
 
-    let region = WireGuardAPI::get_region(region_id)
+    Server::init(config, state_store, args.verbose)
         .await
-        .wrap_err_with(|| format!("failed to get a PIA region for id: {}", region_id))?;
-    let mut api = WireGuardAPI::for_region(&region).wrap_err_with(|| {
-        format!(
-            "failed to create a PIA API instance for region id: {}",
-            region_id
-        )
-    })?;
-
-    let token = WireGuardAPI::get_token(username, password)
+        .wrap_err("failed to initialize server")?
+        .run()
         .await
-        .wrap_err("failed to get a PIA token")?;
-
-    let (secret_key, public_key) = wg::generate_keypair();
-
-    let akr = api
-        .add_key(&token, &public_key)
-        .await
-        .wrap_err("failed to add public key to API")?;
-
-    let config = WgConfig::from(akr, secret_key);
-
-    interface_manager
-        .write_wg_config(config)
-        .await
-        .wrap_err("failed to write the WireGuard configuration")?;
-
-    interface_manager
-        .wg_interface_up()
-        .await
-        .wrap_err("failed to bring up the WireGuard interface")?;
-
-    interface_manager
-        .terminate()
-        .await
-        .wrap_err("failed to terminate the WireGuard interface manager")?;
-
-    let gsr = api
-        .get_signature(&token)
-        .await
-        .wrap_err("failed to get a PIA signature to setup port forwarding")?;
-    dbg!(&gsr);
-
-    let bind_port = api
-        .bind_port(gsr.payload_raw(), &gsr.signature)
-        .await
-        .wrap_err("failed to bind port for port forwarding")?;
-    dbg!(bind_port);
-
-    Ok(())
+        .wrap_err("server encountered an error while running")
 }
 
 #[cfg(feature = "ipc")]
-pub(crate) async fn wgctl(_args: WgctlArgs) -> color_eyre::Result<()> {
+pub(crate) async fn wgctl(
+    args: crate::args::WgctlArgs,
+    mut telemetry: piawg::telemetry::Client,
+) -> Result<()> {
     use tokio::io;
 
-    piawg::ipc::InterfaceManager::new(io::stdin(), io::stdout())
+    if args.verbose > 0 {
+        telemetry.set_verbosity(args.verbose.into()).await?;
+    }
+    debug!(arguments = ?args, "parsed cli arguments");
+
+    let manager = piawg::ipc::InterfaceManager::init(io::stdin(), io::stdout())
+        .await
+        .wrap_err("failed to initialize the WireGuard interface manager")?;
+
+    ignore_sigint()?;
+    #[cfg(unix)]
+    crate::telemetry::start_tracing_level_signal_handler_task(&telemetry)?;
+
+    manager
         .run()
         .await
         .wrap_err("the WireGuard interface manager failed to run to completion")
+}
+
+#[cfg(unix)]
+fn ignore_sigint() -> Result<()> {
+    use tokio::signal::unix::{self, SignalKind};
+
+    let mut sigint = unix::signal(SignalKind::interrupt())?;
+    drop(tokio::spawn(async move {
+        while sigint.recv().await.is_some() {
+            trace!("__wgctl__ received SIGINT, ignoring");
+        }
+    }));
+    Ok(())
+}
+
+#[cfg(windows)]
+fn ignore_sigint() -> Result<()> {
+    use tokio::signal::windows;
+
+    let mut signint = windows::ctrl_c()?;
+    drop(tokio::spawn(async move {
+        while signint.recv().await.is_some() {
+            trace!("__wgctl__ received Ctrl+C, ignoring");
+        }
+    }));
+    Ok(())
 }

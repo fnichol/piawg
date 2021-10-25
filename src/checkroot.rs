@@ -4,6 +4,7 @@
 
 use nix::unistd;
 
+#[must_use]
 pub fn is_root() -> bool {
     unistd::geteuid().is_root()
 }

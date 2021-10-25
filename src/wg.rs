@@ -24,10 +24,11 @@ use tokio::{
     io::{self, AsyncWrite},
     process::Command,
 };
+use tracing::{debug, field::Empty, instrument, Span};
 use typed_builder::TypedBuilder;
 use x25519_dalek::{PublicKey as InnerPublicKey, StaticSecret};
 
-use crate::pia::client::AddKeyResponse;
+use crate::{pia::client::AddKeyResponse, tracing::SpanExt};
 
 const CONFIG_FILE_PREFIX: &str = "/etc/wireguard";
 
@@ -72,6 +73,7 @@ impl fmt::Debug for SecretKey {
 pub struct PublicKey(String);
 
 impl PublicKey {
+    #[must_use]
     pub fn as_str(&self) -> &str {
         self.0.as_str()
     }
@@ -95,6 +97,7 @@ impl FromStr for PublicKey {
 pub struct ServerKey(String);
 
 impl ServerKey {
+    #[must_use]
     pub fn as_str(&self) -> &str {
         self.0.as_str()
     }
@@ -114,6 +117,7 @@ impl FromStr for ServerKey {
     }
 }
 
+#[must_use]
 pub fn generate_keypair() -> (SecretKey, PublicKey) {
     let raw_secret = StaticSecret::new(OsRng);
     let raw_public = InnerPublicKey::from(&raw_secret);
@@ -155,6 +159,7 @@ pub struct WgConfig {
 }
 
 impl WgConfig {
+    #[must_use]
     pub fn from(akr: AddKeyResponse, secret_key: SecretKey) -> Self {
         Self::builder()
             .interface(
@@ -289,24 +294,35 @@ fn find_program(program: impl AsRef<OsStr>) -> Result<PathBuf, WGError> {
     }
 }
 
+#[instrument(
+    skip_all,
+    fields(
+        otel.status_code = Empty,
+        otel.status_message = Empty,
+    )
+)]
 async fn run(command: &mut Command) -> Result<(), WGError> {
+    let span = Span::current();
+
+    debug!(command = ?command, "spawning command");
     command
         .stdin(Stdio::null())
         .stdout(Stdio::inherit())
         .stderr(Stdio::piped())
         .spawn()
-        .map_err(|_| WGError::SpawnFailed)?
+        .map_err(|_| span.record_err(WGError::SpawnFailed))?
         .wait_with_output()
         .await
-        .map_err(|_| WGError::ChildFailed)
+        .map_err(|_| span.record_err(WGError::ChildFailed))
         .and_then(|output| {
             if output.status.success() {
+                span.record_ok();
                 Ok(())
             } else {
-                Err(WGError::CommandFailed(
+                Err(span.record_err(WGError::CommandFailed(
                     output.status.code().unwrap_or(-1),
                     String::from_utf8_lossy(&output.stderr).trim().to_owned(),
-                ))
+                )))
             }
         })
 }

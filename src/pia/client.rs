@@ -18,12 +18,12 @@ use hyper::{
     body::{self, Buf},
     Body, Method, Request, Uri,
 };
-use serde::{de, Deserialize, Deserializer, Serialize};
+use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DisplayFromStr};
 
 use super::{PIAError, PayloadError};
 use crate::{
-    http,
+    datetime, http,
     wg::{PublicKey, ServerKey},
 };
 
@@ -35,7 +35,7 @@ const API_BIND_PORT_PORT: u16 = API_GET_SIGNATURE_PORT;
 
 const PIA_CA: &[u8] = include_bytes!("ca.rsa.4096.crt");
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct WireGuardAPI {
     base_uri: Uri,
     server: IpAddr,
@@ -318,12 +318,10 @@ impl From<GetRegionsResponse> for Regions {
                     .into_iter()
                     .find(|(key, _)| key == "wg")
                     .map(|(_, value)| value)
-                    .map(|mut vec| {
+                    .and_then(|mut vec| {
                         vec.reverse();
                         vec.pop()
-                    })
-                    .flatten()
-                {
+                    }) {
                     Some(server) => {
                         let wg_region = Region {
                             id: region.id.clone(),
@@ -394,9 +392,8 @@ impl FromStr for GetSignaturePayloadRaw {
 
 #[derive(Debug, Deserialize)]
 pub struct GetSignaturePayload {
-    pub token: String,
     pub port: u16,
-    #[serde(deserialize_with = "deserialize_date_time_from_str")]
+    #[serde(deserialize_with = "datetime::deserialize_date_time")]
     pub expires_at: DateTime<FixedOffset>,
 }
 
@@ -437,10 +434,11 @@ pub struct GetSignatureResponse {
     pub payload: GetSignaturePayload,
     pub signature: GetSignatureSignature,
     pub status: String,
-    payload_raw: GetSignaturePayloadRaw,
+    pub(crate) payload_raw: GetSignaturePayloadRaw,
 }
 
 impl GetSignatureResponse {
+    #[must_use]
     pub fn payload_raw(&self) -> &GetSignaturePayloadRaw {
         &self.payload_raw
     }
@@ -465,14 +463,4 @@ impl TryFrom<GetSignatureResponseRaw> for GetSignatureResponse {
 pub struct BindPortResponse {
     pub message: String,
     pub status: String,
-}
-
-fn deserialize_date_time_from_str<'de, D>(
-    deserializer: D,
-) -> Result<DateTime<FixedOffset>, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    let s: String = Deserialize::deserialize(deserializer)?;
-    DateTime::parse_from_rfc3339(&s).map_err(de::Error::custom)
 }

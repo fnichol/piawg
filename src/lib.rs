@@ -19,11 +19,19 @@
 //!
 //! ## Examples
 
+#![allow(
+    clippy::missing_errors_doc,
+    clippy::module_inception,
+    clippy::module_name_repetitions
+)]
 #![doc(html_root_url = "https://docs.rs/piawg/0.1.0-dev")]
 //#![deny(missing_docs)]
 
+use serde::{Deserialize, Serialize};
+
 #[cfg(all(unix, feature = "checkroot"))]
 pub mod checkroot;
+pub(crate) mod datetime;
 pub(crate) mod http;
 #[cfg(feature = "ipc")]
 pub mod ipc;
@@ -33,6 +41,8 @@ pub mod pia;
 #[cfg(all(unix, feature = "privs"))]
 pub mod privs;
 pub mod server;
+pub mod telemetry;
+pub(crate) mod tracing;
 pub mod wg;
 
 const INTERFACE: &str = "pia";
@@ -41,3 +51,18 @@ const INTERFACE: &str = "pia";
 pub use ipc::InterfaceManagerClient;
 #[cfg(not(feature = "ipc"))]
 pub use noipc::InterfaceManagerClient;
+
+#[derive(Debug, Serialize, Deserialize, Eq, Hash, PartialEq)]
+pub struct Graceful(bool);
+
+impl Graceful {
+    fn as_bool(&self) -> bool {
+        self.0
+    }
+}
+
+impl From<bool> for Graceful {
+    fn from(value: bool) -> Self {
+        Self(value)
+    }
+}

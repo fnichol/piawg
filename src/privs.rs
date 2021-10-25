@@ -29,6 +29,7 @@ pub struct PrivDropInfo<'a, 'b, 'c> {
 }
 
 impl<'a, 'b, 'c> PrivDropInfo<'a, 'b, 'c> {
+    #[must_use]
     pub fn new(default_user_name: &'c str) -> Self {
         Self {
             user_name: None,
