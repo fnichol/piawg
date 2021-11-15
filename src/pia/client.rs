@@ -2,19 +2,6 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
-use super::{PIAError, PayloadError};
-use crate::{
-    http,
-    wg::{PublicKey, ServerKey},
-};
-use base64::decode_config;
-use chrono::{DateTime, FixedOffset};
-use hyper::{
-    body::{self, Buf},
-    Body, Method, Request, Uri,
-};
-use serde::{de, Deserialize, Deserializer, Serialize};
-use serde_with::{serde_as, DisplayFromStr};
 use std::{
     collections::HashMap,
     convert::{Infallible, TryFrom, TryInto},
@@ -25,6 +12,21 @@ use std::{
     str::FromStr,
 };
 
+use base64::decode_config;
+use chrono::{DateTime, FixedOffset};
+use hyper::{
+    body::{self, Buf},
+    Body, Method, Request, Uri,
+};
+use serde::{Deserialize, Serialize};
+use serde_with::{serde_as, DisplayFromStr};
+
+use super::{PIAError, PayloadError};
+use crate::{
+    datetime, http,
+    wg::{PublicKey, ServerKey},
+};
+
 const GENERATE_TOKEN_URL: &str = "https://www.privateinternetaccess.com/gtoken/generateToken";
 const GET_REGIONS_URL: &str = "https://serverlist.piaservers.net/vpninfo/servers/v6";
 const API_ADD_KEY_PORT: u16 = 1337;
@@ -33,7 +35,7 @@ const API_BIND_PORT_PORT: u16 = API_GET_SIGNATURE_PORT;
 
 const PIA_CA: &[u8] = include_bytes!("ca.rsa.4096.crt");
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct WireGuardAPI {
     base_uri: Uri,
     server: IpAddr,
@@ -62,7 +64,7 @@ impl WireGuardAPI {
         token: &PIAToken,
         public_key: &PublicKey,
     ) -> Result<AddKeyResponse, PIAError> {
-        let req = Request::builder()
+        let request = Request::builder()
             .method(Method::GET)
             .uri(format!(
                 "{}:{}/addKey?pt={}&pubkey={}",
@@ -74,11 +76,11 @@ impl WireGuardAPI {
             .body(Body::empty())
             .map_err(PIAError::AddKeyRequest)?;
         let socket_addr = SocketAddr::new(self.server, API_ADD_KEY_PORT);
-        let res = http::https_client_with_custom_sni_and_ca(PIA_CA, socket_addr)
-            .request(req)
+        let response = http::https_client_with_custom_sni_and_ca(PIA_CA, socket_addr)
+            .request(request)
             .await
             .map_err(PIAError::AddKeyResponse)?;
-        let body = body::aggregate(res)
+        let body = body::aggregate(response)
             .await
             .map_err(PIAError::ReadResponseBody)?;
         let add_key_response: AddKeyResponse =
@@ -94,7 +96,7 @@ impl WireGuardAPI {
     pub async fn get_signature(&self, token: &PIAToken) -> Result<GetSignatureResponse, PIAError> {
         let server_vip = self.server_vip.ok_or(PIAError::ServerVipNotSet)?;
 
-        let req = Request::builder()
+        let request = Request::builder()
             .method(Method::GET)
             .uri(format!(
                 "{}:{}/getSignature?token={}",
@@ -102,14 +104,14 @@ impl WireGuardAPI {
                 API_GET_SIGNATURE_PORT,
                 urlencoding::encode(token.as_str()),
             ))
-            .body(Default::default())
+            .body(Body::default())
             .map_err(PIAError::GetSignatureRequest)?;
         let socket_addr = SocketAddr::new(server_vip, API_GET_SIGNATURE_PORT);
-        let res = http::https_client_with_custom_sni_and_ca(PIA_CA, socket_addr)
-            .request(req)
+        let response = http::https_client_with_custom_sni_and_ca(PIA_CA, socket_addr)
+            .request(request)
             .await
             .map_err(PIAError::GetSignatureResponse)?;
-        let body = body::aggregate(res)
+        let body = body::aggregate(response)
             .await
             .map_err(PIAError::ReadResponseBody)?;
         let get_signature_response_raw: GetSignatureResponseRaw =
@@ -130,7 +132,7 @@ impl WireGuardAPI {
     ) -> Result<BindPortResponse, PIAError> {
         let server_vip = self.server_vip.ok_or(PIAError::ServerVipNotSet)?;
 
-        let req = Request::builder()
+        let request = Request::builder()
             .method(Method::GET)
             .uri(format!(
                 "{}:{}/bindPort?payload={}&signature={}",
@@ -139,14 +141,14 @@ impl WireGuardAPI {
                 urlencoding::encode(payload.as_str()),
                 urlencoding::encode(signature.as_str()),
             ))
-            .body(Default::default())
+            .body(Body::default())
             .map_err(PIAError::BindPortRequest)?;
         let socket_addr = SocketAddr::new(server_vip, API_BIND_PORT_PORT);
-        let res = http::https_client_with_custom_sni_and_ca(PIA_CA, socket_addr)
-            .request(req)
+        let response = http::https_client_with_custom_sni_and_ca(PIA_CA, socket_addr)
+            .request(request)
             .await
             .map_err(PIAError::BindPortResponse)?;
-        let body = body::aggregate(res)
+        let body = body::aggregate(response)
             .await
             .map_err(PIAError::ReadResponseBody)?;
         let bind_port_response: BindPortResponse =
@@ -162,7 +164,7 @@ impl WireGuardAPI {
         pia_username: impl AsRef<str>,
         pia_password: impl AsRef<str>,
     ) -> Result<PIAToken, PIAError> {
-        let req = Request::builder()
+        let request = Request::builder()
             .method(Method::GET)
             .uri(GENERATE_TOKEN_URL)
             .header(
@@ -171,11 +173,11 @@ impl WireGuardAPI {
             )
             .body(Body::empty())
             .map_err(PIAError::GetTokenRequest)?;
-        let res = http::https_client_native_roots()
-            .request(req)
+        let response = http::https_client_native_roots()
+            .request(request)
             .await
             .map_err(PIAError::GetTokenResponse)?;
-        let body = body::aggregate(res)
+        let body = body::aggregate(response)
             .await
             .map_err(PIAError::ReadResponseBody)?;
         let get_token_response: GetTokenResponse =
@@ -185,16 +187,16 @@ impl WireGuardAPI {
     }
 
     pub async fn get_regions() -> Result<Regions, PIAError> {
-        let req = Request::builder()
+        let request = Request::builder()
             .method(Method::GET)
             .uri(GET_REGIONS_URL)
             .body(Body::empty())
             .map_err(PIAError::GetWGRegionsRequest)?;
-        let res = http::https_client_native_roots()
-            .request(req)
+        let response = http::https_client_native_roots()
+            .request(request)
             .await
             .map_err(PIAError::GetWGRegionsResponse)?;
-        let body = body::aggregate(res)
+        let body = body::aggregate(response)
             .await
             .map_err(PIAError::ReadResponseBody)?
             .reader()
@@ -217,7 +219,7 @@ impl WireGuardAPI {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct PIAToken(String);
 
 impl PIAToken {
@@ -311,32 +313,31 @@ impl From<GetRegionsResponse> for Regions {
             .regions
             .into_iter()
             .filter_map(|region| {
-                if let Some(server) = region
+                match region
                     .servers
                     .into_iter()
                     .find(|(key, _)| key == "wg")
                     .map(|(_, value)| value)
-                    .map(|mut vec| {
+                    .and_then(|mut vec| {
                         vec.reverse();
                         vec.pop()
-                    })
-                    .flatten()
-                {
-                    let wg_region = Region {
-                        id: region.id.clone(),
-                        name: region.name,
-                        country: region.country,
-                        auto_region: region.auto_region,
-                        dns: region.dns,
-                        port_forward: region.port_forward,
-                        geo: region.geo,
-                        server_ip: server.ip,
-                        server_cn: server.cn,
-                    };
+                    }) {
+                    Some(server) => {
+                        let wg_region = Region {
+                            id: region.id.clone(),
+                            name: region.name,
+                            country: region.country,
+                            auto_region: region.auto_region,
+                            dns: region.dns,
+                            port_forward: region.port_forward,
+                            geo: region.geo,
+                            server_ip: server.ip,
+                            server_cn: server.cn,
+                        };
 
-                    Some((region.id, wg_region))
-                } else {
-                    None
+                        Some((region.id, wg_region))
+                    }
+                    None => None,
                 }
             })
             .collect();
@@ -391,9 +392,8 @@ impl FromStr for GetSignaturePayloadRaw {
 
 #[derive(Debug, Deserialize)]
 pub struct GetSignaturePayload {
-    pub token: String,
     pub port: u16,
-    #[serde(deserialize_with = "deserialize_date_time_from_str")]
+    #[serde(deserialize_with = "datetime::deserialize_date_time")]
     pub expires_at: DateTime<FixedOffset>,
 }
 
@@ -434,10 +434,11 @@ pub struct GetSignatureResponse {
     pub payload: GetSignaturePayload,
     pub signature: GetSignatureSignature,
     pub status: String,
-    payload_raw: GetSignaturePayloadRaw,
+    pub(crate) payload_raw: GetSignaturePayloadRaw,
 }
 
 impl GetSignatureResponse {
+    #[must_use]
     pub fn payload_raw(&self) -> &GetSignaturePayloadRaw {
         &self.payload_raw
     }
@@ -462,14 +463,4 @@ impl TryFrom<GetSignatureResponseRaw> for GetSignatureResponse {
 pub struct BindPortResponse {
     pub message: String,
     pub status: String,
-}
-
-fn deserialize_date_time_from_str<'de, D>(
-    deserializer: D,
-) -> Result<DateTime<FixedOffset>, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    let s: String = Deserialize::deserialize(deserializer)?;
-    DateTime::parse_from_rfc3339(&s).map_err(de::Error::custom)
 }

@@ -2,10 +2,11 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
-use crate::wg::{WGError, WgConfig, WgQuick};
-use futures::{SinkExt, StreamExt, TryStreamExt};
-use serde::{Deserialize, Serialize};
 use std::{env, fmt, process::Stdio, time::Duration};
+
+use futures::{SinkExt, StreamExt, TryStreamExt};
+use opentelemetry::trace::SpanKind;
+use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use tokio::{
     io::{AsyncWriteExt, Stdin, Stdout},
@@ -17,9 +18,19 @@ use tokio_serde::{
     Framed, SymmetricallyFramed,
 };
 use tokio_util::codec::{FramedRead, FramedWrite, LengthDelimitedCodec};
+use tracing::{debug, error, field::Empty, info, instrument, trace, warn, Span};
 
-const RX_TIMEOUT_SECS: Duration = Duration::from_secs(5);
-const TX_TIMEOUT_SECS: Duration = Duration::from_secs(5);
+use crate::{
+    tracing::SpanExt,
+    wg::{WGError, WgConfig, WgQuick},
+    Graceful,
+};
+
+const RX_TIMEOUT: Duration = Duration::from_secs(5);
+const TX_TIMEOUT: Duration = Duration::from_secs(5);
+
+const TF_M_SYSTEM: &str = "stdio-framed-json";
+const TF_M_DESTINATION_KIND: &str = "queue";
 
 #[derive(Debug, Error)]
 pub enum IpcError {
@@ -49,6 +60,8 @@ pub enum IpcError {
     StreamClosedOnStart,
     #[error("IPC stream closed before reponse message was read")]
     StreamClosedBeforeResponse,
+    #[error("IPC stream closed before request message was read")]
+    StreamClosedBeforeRequest,
     #[error("ipc wireguard error")]
     WG(#[from] WGError),
     #[error("failed to write WireGuard configuration file: {0}")]
@@ -64,7 +77,7 @@ pub enum Request {
     Start,
     WriteWgConfig(WgConfig),
     WgInterfaceUp,
-    WgInterfaceDown,
+    WgInterfaceDown(Graceful),
     Terminate,
 }
 
@@ -113,14 +126,34 @@ pub struct InterfaceManagerClient {
 }
 
 impl InterfaceManagerClient {
-    pub async fn start() -> Result<Self, IpcError> {
-        let current_exe = env::current_exe().map_err(IpcError::CurrentExePath)?;
-        let mut child = Command::new(current_exe)
-            .arg("__wgctl__")
+    #[instrument(
+        name = "interface_manager_client init",
+        skip_all,
+        fields(
+            net.transport = "pipe",
+            otel.kind = %SpanKind::Client,
+            otel.status_code = Empty,
+            otel.status_message = Empty,
+        )
+    )]
+    pub async fn init(verbosity: usize) -> Result<Self, IpcError> {
+        let span = Span::current();
+
+        let current_exe =
+            env::current_exe().map_err(|err| span.record_err(IpcError::CurrentExePath(err)))?;
+        let mut cmd = Command::new(current_exe);
+        cmd.arg("__wgctl__")
             .stdin(Stdio::piped())
-            .stdout(Stdio::piped())
+            .stdout(Stdio::piped());
+        if verbosity > 0 {
+            for _ in 0..verbosity {
+                cmd.arg("--verbose");
+            }
+        }
+        debug!(command = ?cmd, "spawning command");
+        let mut child = cmd
             .spawn()
-            .map_err(IpcError::ChildSpawn)?;
+            .map_err(|err| span.record_err(IpcError::ChildSpawn(err)))?;
         let mut rx = {
             let stdout = child.stdout.take().ok_or(IpcError::ChildIO("stdout"))?;
             let codec = FramedRead::new(stdout, LengthDelimitedCodec::new());
@@ -132,73 +165,160 @@ impl InterfaceManagerClient {
             SymmetricallyFramed::new(codec, SymmetricalJson::default())
         };
 
-        time::timeout(Duration::from_secs(5), tx.send(Request::Start))
+        send_to_child(&mut tx, Request::Start, TX_TIMEOUT)
             .await
-            .map_err(IpcError::SendTimeout)?
-            .map_err(IpcError::SendIO)?;
-        eprintln!("InterfaceManagerClient: sent Request::Start");
-
-        match time::timeout(Duration::from_secs(5), rx.try_next())
+            .map_err(|err| span.record_err(err))?;
+        match receive_from_child(&mut rx, RX_TIMEOUT)
             .await
-            .map_err(IpcError::ReadTimeout)?
-            .map_err(IpcError::ReadIO)?
+            .map_err(|err| span.record_err(err))?
         {
-            Some(msg) => match msg {
-                Response::Ready => eprintln!("InterfaceManagerClient: get Response::Ready"),
-                invalid => return Err(IpcError::InvalidMessageReponse(invalid)),
-            },
-            None => return Err(IpcError::StreamClosedOnStart),
+            Response::Ready => {}
+            invalid => return Err(span.record_err(IpcError::InvalidMessageReponse(invalid))),
         };
 
+        span.record_ok();
         Ok(Self { child, rx, tx })
     }
 
+    #[instrument(
+        name = "piawg.ipc.InterfaceManager/write_wg_config",
+        skip_all,
+        fields(
+            net.transport = "pipe",
+            otel.kind = %SpanKind::Client,
+            otel.status_code = Empty,
+            otel.status_message = Empty,
+            rpc.system = "stdio-rpc",
+            rpc.service = "piawg.ipc.InterfaceManager",
+            rpc.method = "write_wg_config",
+        )
+    )]
     pub async fn write_wg_config(&mut self, config: WgConfig) -> Result<(), IpcError> {
-        match self.send(Request::WriteWgConfig(config)).await? {
-            Response::WriteWgConfig(result) => result.map_err(IpcError::WGWriteConfig),
-            invalid => Err(IpcError::InvalidMessageReponse(invalid)),
-        }
-    }
+        let span = Span::current();
 
-    pub async fn wg_interface_up(&mut self) -> Result<(), IpcError> {
-        match self.send(Request::WgInterfaceUp).await? {
-            Response::WgInterfaceUp(result) => result.map_err(IpcError::WGInterfaceUp),
-            invalid => Err(IpcError::InvalidMessageReponse(invalid)),
-        }
-    }
-
-    pub async fn wg_interface_down(&mut self) -> Result<(), IpcError> {
-        match self.send(Request::WgInterfaceDown).await? {
-            Response::WgInterfaceDown(result) => result.map_err(IpcError::WGInterfaceDown),
-            invalid => Err(IpcError::InvalidMessageReponse(invalid)),
-        }
-    }
-
-    pub async fn terminate(mut self) -> Result<(), IpcError> {
-        match self.send(Request::Terminate).await? {
-            Response::Terminated => (),
-            invalid => return Err(IpcError::InvalidMessageReponse(invalid)),
-        };
-        self.tx
-            .into_inner()
-            .into_inner()
-            .shutdown()
+        match self
+            .send(Request::WriteWgConfig(config))
             .await
-            .map_err(|_| IpcError::SendShutdown)?;
-        self.child.wait().await.map_err(IpcError::ChildWait)?;
+            .map_err(|err| span.record_err(err))?
+        {
+            Response::WriteWgConfig(result) => {
+                result.map_err(|err| span.record_err(IpcError::WGWriteConfig(err)))?;
+            }
+            invalid => return Err(span.record_err(IpcError::InvalidMessageReponse(invalid))),
+        }
+
+        span.record_ok();
+        Ok(())
+    }
+
+    #[instrument(
+        name = "piawg.ipc.InterfaceManager/wg_interface_up",
+        skip_all,
+        fields(
+            net.transport = "pipe",
+            otel.kind = %SpanKind::Client,
+            otel.status_code = Empty,
+            otel.status_message = Empty,
+            rpc.system = "stdio-rpc",
+            rpc.service = "piawg.ipc.InterfaceManager",
+            rpc.method = "wg_interface_up",
+        )
+    )]
+    pub async fn wg_interface_up(&mut self) -> Result<(), IpcError> {
+        let span = Span::current();
+
+        match self
+            .send(Request::WgInterfaceUp)
+            .await
+            .map_err(|err| span.record_err(err))?
+        {
+            Response::WgInterfaceUp(result) => {
+                result.map_err(|err| span.record_err(IpcError::WGInterfaceUp(err)))?;
+            }
+            invalid => return Err(span.record_err(IpcError::InvalidMessageReponse(invalid))),
+        }
+
+        span.record_ok();
+        Ok(())
+    }
+
+    #[instrument(
+        name = "piawg.ipc.InterfaceManager/wg_interface_down",
+        skip_all,
+        fields(
+            net.transport = "pipe",
+            otel.kind = %SpanKind::Client,
+            otel.status_code = Empty,
+            otel.status_message = Empty,
+            rpc.system = "stdio-rpc",
+            rpc.service = "piawg.ipc.InterfaceManager",
+            rpc.method = "wg_interface_down",
+        )
+    )]
+    pub async fn wg_interface_down(
+        &mut self,
+        graceful: impl Into<Graceful>,
+    ) -> Result<(), IpcError> {
+        let span = Span::current();
+
+        let graceful = graceful.into();
+        trace!(graceful = graceful.as_bool());
+
+        match self
+            .send(Request::WgInterfaceDown(graceful))
+            .await
+            .map_err(|err| span.record_err(err))?
+        {
+            Response::WgInterfaceDown(result) => {
+                result.map_err(|err| span.record_err(IpcError::WGInterfaceDown(err)))?;
+            }
+            invalid => return Err(span.record_err(IpcError::InvalidMessageReponse(invalid))),
+        }
+
+        span.record_ok();
+        Ok(())
+    }
+
+    #[instrument(
+        name = "piawg.ipc.InterfaceManager/terminate",
+        skip_all,
+        fields(
+            net.transport = "pipe",
+            otel.kind = %SpanKind::Client,
+            otel.status_code = Empty,
+            otel.status_message = Empty,
+            rpc.system = "stdio-rpc",
+            rpc.service = "piawg.ipc.InterfaceManager",
+            rpc.method = "terminate",
+        )
+    )]
+    pub async fn terminate(&mut self) -> Result<(), IpcError> {
+        let span = Span::current();
+
+        match self
+            .send(Request::Terminate)
+            .await
+            .map_err(|err| span.record_err(err))?
+        {
+            Response::Terminated => {}
+            invalid => return Err(span.record_err(IpcError::InvalidMessageReponse(invalid))),
+        }
+        self.tx
+            .close()
+            .await
+            .map_err(|_| span.record_err(IpcError::SendShutdown))?;
+        self.child
+            .wait()
+            .await
+            .map_err(|err| span.record_err(IpcError::ChildWait(err)))?;
+
+        span.record_ok();
         Ok(())
     }
 
     async fn send(&mut self, request: Request) -> Result<Response, IpcError> {
-        time::timeout(TX_TIMEOUT_SECS, self.tx.send(request))
-            .await
-            .map_err(IpcError::SendTimeout)?
-            .map_err(IpcError::SendIO)?;
-        time::timeout(RX_TIMEOUT_SECS, self.rx.try_next())
-            .await
-            .map_err(IpcError::ReadTimeout)?
-            .map_err(IpcError::ReadIO)?
-            .ok_or(IpcError::StreamClosedBeforeResponse)
+        send_to_child(&mut self.tx, request, TX_TIMEOUT).await?;
+        receive_from_child(&mut self.rx, RX_TIMEOUT).await
     }
 }
 
@@ -213,83 +333,111 @@ pub struct InterfaceManager {
 }
 
 impl InterfaceManager {
-    pub fn new(stdin: Stdin, stdout: Stdout) -> Self {
-        let rx = {
+    #[instrument(
+        name = "interface_manager init",
+        skip_all,
+        fields(
+            net.transport = "pipe",
+            otel.kind = %SpanKind::Client,
+            otel.status_code = Empty,
+            otel.status_message = Empty,
+        )
+    )]
+    pub async fn init(stdin: Stdin, stdout: Stdout) -> Result<Self, IpcError> {
+        let span = Span::current();
+
+        let mut rx = {
             let codec = FramedRead::new(stdin, LengthDelimitedCodec::new());
             SymmetricallyFramed::new(codec, SymmetricalJson::default())
         };
-        let tx = {
+        let mut tx = {
             let codec = FramedWrite::new(stdout, LengthDelimitedCodec::new());
             SymmetricallyFramed::new(codec, SymmetricalJson::default())
         };
-        Self { rx, tx }
+
+        match receive_from_parent(&mut rx, RX_TIMEOUT)
+            .await
+            .map_err(|err| span.record_err(err))?
+        {
+            Request::Start => {}
+            invalid => return Err(span.record_err(IpcError::InvalidMessageRequest(invalid))),
+        };
+        send_to_parent(&mut tx, Response::Ready, TX_TIMEOUT)
+            .await
+            .map_err(|err| span.record_err(err))?;
+
+        span.record_ok();
+        Ok(Self { rx, tx })
     }
 
+    #[instrument(
+        name = "interface_manager run",
+        skip_all,
+        fields(
+            net.transport = "pipe",
+            otel.kind = %SpanKind::Server,
+            otel.status_code = Empty,
+            otel.status_message = Empty,
+        )
+    )]
     pub async fn run(mut self) -> Result<(), IpcError> {
-        match time::timeout(RX_TIMEOUT_SECS, self.rx.try_next())
-            .await
-            .map_err(IpcError::ReadTimeout)?
-            .map_err(IpcError::ReadIO)?
-        {
-            Some(msg) => match msg {
-                Request::Start => eprintln!("InterfaceManager: got Request::Start"),
-                invalid => return Err(IpcError::InvalidMessageRequest(invalid)),
-            },
-            None => return Err(IpcError::StreamClosedOnStart),
-        };
-        self.send(Response::Ready).await?;
-        eprintln!("InterfaceManager: sent Response::Ready");
+        let span = Span::current();
 
-        while let Some(item) = time::timeout(RX_TIMEOUT_SECS, self.rx.next())
-            .await
-            .map_err(IpcError::ReadTimeout)?
-        {
+        while let Some(item) = self.rx.next().await {
             let request = match item {
                 Ok(request) => request,
                 Err(err) => {
-                    eprintln!("TODO: error rx next item: {:?}", err);
+                    warn!(error = %err, "error while reading message, skipping and continuing");
                     continue;
                 }
             };
 
             match request {
                 Request::Start => {
-                    eprintln!("TODO: already started, invalid message");
-                    continue;
+                    error!(request = ?request, "received start after initial start, shutting down");
+                    return Err(span.record_err(IpcError::InvalidMessageRequest(request)));
                 }
                 Request::WgInterfaceUp => {
                     let result = match Self::wg_interface_up().await {
                         Ok(()) => Ok(()),
                         Err(err) => {
-                            eprintln!("TODO: error bringing up wg interface: {:?}", err);
+                            warn!(error = %err, "error bringing up WireGuard interface");
                             Err(err.into())
                         }
                     };
-                    self.send(Response::WgInterfaceUp(result)).await?
+                    self.send_to_parent(Response::WgInterfaceUp(result), TX_TIMEOUT)
+                        .await
+                        .map_err(|err| span.record_err(err))?;
                 }
-                Request::WgInterfaceDown => {
-                    let result = match Self::wg_interface_down().await {
+                Request::WgInterfaceDown(graceful) => {
+                    let result = match Self::wg_interface_down(graceful).await {
                         Ok(()) => Ok(()),
                         Err(err) => {
-                            eprintln!("TODO: error bringing down wg interface: {:?}", err);
+                            warn!(error = ?err, "error bringing down WireGuard interface");
                             Err(err.into())
                         }
                     };
-                    self.send(Response::WgInterfaceDown(result)).await?
+                    self.send_to_parent(Response::WgInterfaceDown(result), TX_TIMEOUT)
+                        .await
+                        .map_err(|err| span.record_err(err))?;
                 }
                 Request::WriteWgConfig(config) => {
                     let result = match Self::write_wg_config(&config).await {
                         Ok(()) => Ok(()),
                         Err(err) => {
-                            eprintln!("TODO: error writing wg config: {:?}", err);
+                            warn!(error = %err, "error writing WireGuard config");
                             Err(err.into())
                         }
                     };
-                    self.send(Response::WriteWgConfig(result)).await?
+                    self.send_to_parent(Response::WriteWgConfig(result), TX_TIMEOUT)
+                        .await
+                        .map_err(|err| span.record_err(err))?;
                 }
                 Request::Terminate => {
-                    eprintln!("InterfaceManager: shutting down");
-                    self.send(Response::Terminated).await?;
+                    info!("interface manager shutting down");
+                    self.send_to_parent(Response::Terminated, TX_TIMEOUT)
+                        .await
+                        .map_err(|err| span.record_err(err))?;
                     break;
                 }
             }
@@ -300,37 +448,201 @@ impl InterfaceManager {
             .into_inner()
             .shutdown()
             .await
-            .map_err(|_| IpcError::SendShutdown)?;
-        eprintln!("InterfaceManager: shutdown");
+            .map_err(|_| span.record_err(IpcError::SendShutdown))?;
+        info!("shutdown.");
+
+        span.record_ok();
         Ok(())
     }
 
-    async fn send(&mut self, response: Response) -> Result<(), IpcError> {
-        time::timeout(TX_TIMEOUT_SECS, self.tx.send(response))
-            .await
-            .map_err(IpcError::SendTimeout)?
-            .map_err(IpcError::SendIO)?;
-        Ok(())
+    async fn send_to_parent(
+        &mut self,
+        response: Response,
+        timeout: Duration,
+    ) -> Result<(), IpcError> {
+        send_to_parent(&mut self.tx, response, timeout).await
     }
 
     async fn wg_interface_up() -> Result<(), IpcError> {
         WgQuick::for_existing_interface(crate::INTERFACE)?
             .up()
             .await
-            .map_err(From::from)
+            .map_err(Into::into)
     }
 
-    async fn wg_interface_down() -> Result<(), IpcError> {
-        WgQuick::for_existing_interface(crate::INTERFACE)?
-            .down()
-            .await
-            .map_err(From::from)
+    async fn wg_interface_down(graceful: impl Into<Graceful>) -> Result<(), IpcError> {
+        let mut interface = WgQuick::for_existing_interface(crate::INTERFACE)?;
+
+        match interface.down().await {
+            Ok(()) => Ok(()),
+            Err(WGError::ConfigFileNotFound(c)) => {
+                if graceful.into().as_bool() {
+                    Ok(())
+                } else {
+                    Err(WGError::ConfigFileNotFound(c).into())
+                }
+            }
+            Err(WGError::CommandFailed(c, s)) => {
+                if graceful.into().as_bool() {
+                    Ok(())
+                } else {
+                    Err(WGError::CommandFailed(c, s).into())
+                }
+            }
+            Err(err) => Err(err.into()),
+        }
     }
 
     async fn write_wg_config(config: &WgConfig) -> Result<(), IpcError> {
         WgQuick::for_interface(crate::INTERFACE, config)
             .await
-            .map_err(From::from)
+            .map_err(Into::into)
             .map(|_| ())
     }
+}
+
+#[instrument(
+    name = "interface_manager send",
+    level = "trace",
+    skip_all,
+    fields(
+        messaging.destination = "interface_manager",
+        messaging.destination_kind = TF_M_DESTINATION_KIND,
+        messaging.system = TF_M_SYSTEM,
+        net.transport = "pipe",
+        otel.kind = %SpanKind::Client,
+        otel.status_code = Empty,
+        otel.status_message = Empty,
+    )
+)]
+async fn send_to_child(
+    tx: &mut Framed<
+        FramedWrite<ChildStdin, LengthDelimitedCodec>,
+        Request,
+        Request,
+        Json<Request, Request>,
+    >,
+    request: Request,
+    timeout: Duration,
+) -> Result<(), IpcError> {
+    let span = Span::current();
+    debug!(request = ?request, "sending request");
+    time::timeout(timeout, tx.send(request))
+        .await
+        .map_err(|err| span.record_err(IpcError::SendTimeout(err)))?
+        .map_err(|err| span.record_err(IpcError::SendIO(err)))?;
+    trace!(message._type = "SENT", message.id = 1);
+
+    span.record_ok();
+    Ok(())
+}
+
+#[instrument(
+    name = "interface_manager receive",
+    level = "trace",
+    skip_all,
+    fields(
+        messaging.destination = "interface_manager",
+        messaging.destination_kind = TF_M_DESTINATION_KIND,
+        messaging.system = TF_M_SYSTEM,
+        net.transport = "pipe",
+        otel.kind = %SpanKind::Server,
+        otel.status_code = Empty,
+        otel.status_message = Empty,
+    )
+)]
+async fn receive_from_child(
+    rx: &mut Framed<
+        FramedRead<ChildStdout, LengthDelimitedCodec>,
+        Response,
+        Response,
+        Json<Response, Response>,
+    >,
+    timeout: Duration,
+) -> Result<Response, IpcError> {
+    let span = Span::current();
+    let response = time::timeout(timeout, rx.try_next())
+        .await
+        .map_err(|err| span.record_err(IpcError::ReadTimeout(err)))?
+        .map_err(|err| span.record_err(IpcError::ReadIO(err)))?
+        .ok_or_else(|| span.record_err(IpcError::StreamClosedBeforeResponse))?;
+    trace!(message._type = "RECEIVED", message.id = 1);
+    debug!(response = ?response, "received response");
+
+    span.record_ok();
+    Ok(response)
+}
+
+#[instrument(
+    name = "interface_manager_client send",
+    level = "trace",
+    skip_all,
+    fields(
+        messaging.destination = "interface_manager_client",
+        messaging.destination_kind = TF_M_DESTINATION_KIND,
+        messaging.system = TF_M_SYSTEM,
+        net.transport = "pipe",
+        otel.kind = %SpanKind::Client,
+        otel.status_code = Empty,
+        otel.status_message = Empty,
+    )
+)]
+async fn send_to_parent(
+    tx: &mut Framed<
+        FramedWrite<Stdout, LengthDelimitedCodec>,
+        Response,
+        Response,
+        Json<Response, Response>,
+    >,
+    response: Response,
+    timeout: Duration,
+) -> Result<(), IpcError> {
+    let span = Span::current();
+
+    debug!(response = ?response, "sending response");
+    time::timeout(timeout, tx.send(response))
+        .await
+        .map_err(|err| span.record_err(IpcError::SendTimeout(err)))?
+        .map_err(|err| span.record_err(IpcError::SendIO(err)))?;
+    trace!(message._type = "SENT", message.id = 1);
+
+    span.record_ok();
+    Ok(())
+}
+
+#[instrument(
+    name = "interface_manager_client receive",
+    level = "trace",
+    skip_all,
+    fields(
+        messaging.destination = "interface_manager_client",
+        messaging.destination_kind = TF_M_DESTINATION_KIND,
+        messaging.system = TF_M_SYSTEM,
+        net.transport = "pipe",
+        otel.kind = %SpanKind::Server,
+        otel.status_code = Empty,
+        otel.status_message = Empty,
+    )
+)]
+async fn receive_from_parent(
+    rx: &mut Framed<
+        FramedRead<Stdin, LengthDelimitedCodec>,
+        Request,
+        Request,
+        Json<Request, Request>,
+    >,
+    timeout: Duration,
+) -> Result<Request, IpcError> {
+    let span = Span::current();
+
+    let request = time::timeout(timeout, rx.try_next())
+        .await
+        .map_err(IpcError::ReadTimeout)?
+        .map_err(IpcError::ReadIO)?
+        .ok_or(IpcError::StreamClosedBeforeRequest)?;
+    trace!(message._type = "RECEIVED", message.id = 1);
+    debug!(request = ?request, "receiving request");
+
+    span.record_ok();
+    Ok(request)
 }

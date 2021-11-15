@@ -2,9 +2,10 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
+use std::{borrow::Cow, env};
+
 use nix::unistd::{Group, User};
 use privdrop::PrivDrop;
-use std::{borrow::Cow, env};
 use thiserror::Error;
 
 #[derive(Debug, Error)]
@@ -28,6 +29,7 @@ pub struct PrivDropInfo<'a, 'b, 'c> {
 }
 
 impl<'a, 'b, 'c> PrivDropInfo<'a, 'b, 'c> {
+    #[must_use]
     pub fn new(default_user_name: &'c str) -> Self {
         Self {
             user_name: None,
@@ -47,7 +49,7 @@ impl<'a, 'b, 'c> PrivDropInfo<'a, 'b, 'c> {
     }
 }
 
-pub fn privdrop(info: PrivDropInfo<'_, '_, '_>) -> Result<(), PrivError> {
+pub fn privdrop(info: &PrivDropInfo<'_, '_, '_>) -> Result<(), PrivError> {
     let user_name = match info.user_name {
         Some(user_name) => Cow::from(user_name),
         None => Cow::from(determine_user(info.default_user_name)),

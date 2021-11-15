@@ -2,8 +2,12 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
-use crate::wg::{WGError, WgConfig, WgQuick};
 use thiserror::Error;
+
+use crate::{
+    wg::{WGError, WgConfig, WgQuick},
+    Graceful,
+};
 
 #[derive(Debug, Error)]
 pub enum NoIpcError {
@@ -17,7 +21,7 @@ pub struct InterfaceManagerClient {}
 
 #[cfg(not(feature = "ipc"))]
 impl InterfaceManagerClient {
-    pub async fn start() -> Result<Self, NoIpcError> {
+    pub async fn init(_verbosity: usize) -> Result<Self, NoIpcError> {
         Ok(Self {})
     }
 
@@ -28,11 +32,23 @@ impl InterfaceManagerClient {
             .map_err(From::from)
     }
 
-    pub async fn wg_interface_down(&mut self) -> Result<(), NoIpcError> {
-        WgQuick::for_existing_interface(crate::INTERFACE)?
-            .down()
-            .await
-            .map_err(From::from)
+    pub async fn wg_interface_down(
+        &mut self,
+        graceful: impl Into<Graceful>,
+    ) -> Result<(), NoIpcError> {
+        let mut interface = WgQuick::for_existing_interface(crate::INTERFACE)?;
+
+        match interface.down().await {
+            Ok(()) => Ok(()),
+            Err(WGError::ConfigFileNotFound(c)) => {
+                if graceful.into().as_bool() {
+                    Ok(())
+                } else {
+                    Err(WGError::ConfigFileNotFound(c).into())
+                }
+            }
+            Err(err) => Err(err.into()),
+        }
     }
 
     pub async fn write_wg_config(&mut self, config: WgConfig) -> Result<(), NoIpcError> {
@@ -42,7 +58,7 @@ impl InterfaceManagerClient {
             .map(|_| ())
     }
 
-    pub async fn terminate(self) -> Result<(), NoIpcError> {
+    pub async fn terminate(&mut self) -> Result<(), NoIpcError> {
         Ok(())
     }
 }
